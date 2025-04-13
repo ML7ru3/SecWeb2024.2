@@ -1,45 +1,74 @@
-import React, { useState }from 'react'
+import React, { useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import { UserContext } from '../../context/UserContext';
+import '../styles/Login.css';
 
 export default function Login() {
     const navigate = useNavigate();
+    const { user, setUser } = useContext(UserContext);
+
     const [data, setData] = useState({
-            email: '',  
-            password: '',
-    })
+        email: '',
+        password: '',
+    });
+
+    // check out login if user is logged in
+    useEffect(() => {
+        if (user) {
+            navigate('/gameboard'); 
+        }
+    }, [user, navigate]);
 
     const LoginUser = async (e) => {
         e.preventDefault();
-        const {email, password} = data;
+        const { email, password } = data;
         try {
-            const {data} = await axios.post('/login', {
-                email, 
-                password
-            })
-            if (data.error) {
-                toast.error(data.error)
+            const res = await axios.post('/login', { email, password });
+
+            if (res.data.error) {
+                toast.error(res.data.error);
             } else {
-                setData({});
-                navigate('/dashboard');
+                const profileRes = await axios.get('/profile');
+                setUser(profileRes.data);
+                toast.success("Login successful!");
+                setData({ email: '', password: '' });
+                navigate('/gameboard');
             }
         } catch (error) {
-            
+            console.error(error);
+            toast.error("Login failed. Please try again!");
         }
-    }
+    };
 
     return (
-        <div>
-            <form onSubmit={LoginUser}>
+        <div className="login-container">
+            <form className="login-form" onSubmit={LoginUser}>
+                <h2>Login</h2>
+
                 <label htmlFor="email">Email</label>
-                <input type="email" id="email" name="email" value={data.email} onChange={(e) => setData({...data, email: e.target.value})}/>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={data.email}
+                    onChange={(e) => setData({ ...data, email: e.target.value })}
+                    required
+                />
 
                 <label htmlFor="password">Password</label>
-                <input type="password" id="password" name="password" value={data.password} onChange={(e) => setData({...data, password: e.target.value})}/>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    value={data.password}
+                    onChange={(e) => setData({ ...data, password: e.target.value })}
+                    required
+                />
 
                 <button type="submit">Login</button>
             </form>
         </div>
-    )
+    );
 }
