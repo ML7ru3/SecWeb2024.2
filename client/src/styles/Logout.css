@@ -1,0 +1,97 @@
+
+.logout-button {
+    padding: 14px 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #2d2d2d;
+    background: linear-gradient(
+      135deg,
+      #fdfd96,  
+      #ffb3ba,  
+      #baffc9,  
+      #bae1ff   
+    );
+    background-size: 300% 300%;
+    animation: rainbowBG 8s ease infinite;
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 4px 12px rgba(160, 196, 255, 0.3); 
+}
+
+
+.logout-button:hover {
+    transform: scale(1.04);
+    box-shadow: 0 6px 20px rgba(239, 159, 162, 0.3);
+}
+
+
+.logout-button:active {
+    transform: scale(0.98);
+    box-shadow: 0 2px 8px rgba(255, 154, 158, 0.2);
+    filter: brightness(0.95); 
+}
+
+
+@keyframes rainbowBG {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.swal-popup {
+    background: #fff !important;
+    border-radius: 16px !important;
+    padding: 20px !important;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1) !important;
+    text-align: center;
+}
+
+.swal-title {
+    font-size: 1.5rem;
+    color: #333;
+    font-weight: 700;
+}
+
+.swal-content {
+    font-size: 1rem;
+    color: #555;
+    margin: 15px 0;
+}
+
+.swal-confirm-button {
+    background-color: #ff6f61 !important; 
+    border-radius: 12px;
+    padding: 10px 20px;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 4px 12px rgba(160, 196, 255, 0.3);
+}
+
+.swal-cancel-button {
+    background-color: #4caf50 !important;
+    border-radius: 12px;
+    padding: 10px 20px;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 4px 12px rgba(160, 196, 255, 0.3);
+}
+
+.swal-confirm-button:hover, .swal-cancel-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.swal-confirm-button:active, .swal-cancel-button:active {
+    transform: scale(0.98);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    filter: brightness(0.95);
+}
+
+
+.swal2-backdrop {
+    background-color: rgba(0, 0, 0, 0.5) !important;
+}

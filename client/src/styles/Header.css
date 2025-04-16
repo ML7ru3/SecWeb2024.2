@@ -1,0 +1,159 @@
+/* Header full width fixed at top */
+.header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    z-index: 1000;
+}
+
+/* Logo section */
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+}
+
+.logo {
+    height: 60px;
+    width: 60px;
+    border-radius: 16px;
+    transition: transform 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.logo:hover {
+    transform: scale(1.08);
+}
+
+/* Navigation links */
+.nav-links {
+    display: flex;
+    gap: 32px;
+}
+
+.nav-links a {
+    text-decoration: none;
+    color: #5e548e;
+    font-size: 18px;
+    font-weight: 600;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.nav-links a::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 0%;
+    height: 2px;
+    background-color: #cdb4db; 
+    transition: width 0.3s ease;
+    border-radius: 2px;
+}
+
+.nav-links a:hover {
+    color: #b185db; 
+}
+
+.nav-links a:hover::after {
+    width: 100%;
+}
+
+
+.nav-links a.active,
+.nav-links a:focus {
+    color: #d490a9; 
+    font-weight: 700;
+}
+
+
+/* Responsive tweaks */
+@media (max-width: 600px) {
+    .header {
+        flex-direction: column;
+        height: auto;
+        padding: 16px;
+        align-items: flex-start;
+    }
+
+    .logo {
+        height: 50px;
+        width: 50px;
+    }
+
+    .nav-links {
+        gap: 16px;
+        margin-top: 8px;
+    }
+}
+
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 8px; 
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    transition: color 0.3s ease;
+}
+
+
+.user-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%; 
+    background: linear-gradient(
+      135deg,
+      #fdfd96,  
+      #ffb3ba,  
+      #baffc9,  
+      #bae1ff   
+    );
+    background-size: 300% 300%;
+    animation: rainbowBG 8s ease infinite;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #2d2d2d;
+    font-size: 18px;
+    font-weight: bold;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+
+.user-icon:hover {
+    transform: scale(1.1); 
+    box-shadow: 0 6px 20px rgba(255, 123, 123, 0.3); 
+}
+
+
+.user-info:hover {
+    color: #d490a9; 
+}
+
+
+.user-icon:focus {
+    outline: none;
+    border: 2px solid #d490a9; 
+}
+
+
+@media (max-width: 600px) {
+    .user-info {
+        font-size: 14px; 
+    }
+
+    .user-icon {
+        width: 35px; 
+        height: 35px;
+        font-size: 16px;
+    }
+}

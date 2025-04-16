@@ -1,0 +1,114 @@
+body {
+    background: linear-gradient(135deg, #fde2e4, #fad2e1, #e2f0cb, #cddafd, #ffc8dd);
+    background-size: 400% 400%;
+    animation: gradientBG 20s ease infinite;
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
+  
+  @keyframes gradientBG {
+    0% {background-position: 0% 50%;}
+    50% {background-position: 100% 50%;}
+    100% {background-position: 0% 50%;}
+  }
+  
+  .gameboard {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 32px;
+    backdrop-filter: blur(18px);
+    padding: 40px;
+    width: 100%;
+    max-width: 780px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    transition: transform 0.3s ease;
+  }
+  
+  /* Header */
+  .gameboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  
+  .game-title {
+    font-size: 3rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #ffafcc, #cdb4db, #bde0fe);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.1);
+    margin: 0;
+  }
+  
+  
+  /* Score */
+  .score-group {
+    display: flex;
+    gap: 14px;
+    margin-top: 10px;
+    flex-shrink: 0;
+  }
+  
+  .score-box {
+    background: rgba(255, 255, 255, 0.45);
+    color: #2d2d2d;
+    font-weight: 600;
+    padding: 12px 18px;
+    border-radius: 12px;
+    text-align: center;
+    min-width: 80px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(8px);
+  }
+  
+  /* Grid */
+  .grid-placeholder {
+    padding: 140px;
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 20px;
+    margin-bottom: 24px;
+    text-align: center;
+    font-size: 1.2rem;
+    color: #444;
+    font-weight: 500;
+  }
+  
+  /* Button */
+  .button-group {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+  }
+  
+  .button {
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, #ffcad4, #fcd5ce, #d8e2dc);
+    color:#2d2d2d;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  
+  .button:hover {
+    transform: scale(1.05);
+    background: linear-gradient(135deg, #ffc8dd, #e2f0cb, #bde0fe);
+  }
+  
+
+  
+  
