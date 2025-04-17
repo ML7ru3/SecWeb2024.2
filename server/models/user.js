@@ -7,8 +7,11 @@ const userSchema = new Schema({
         type: String,
         unique: true
     },
-    password: String
-}); 
+    password: String,
+    bestScore: { type: Number, default: 0},
+    savedBoard: { type: Array, default: [] }, 
+    score: { type: Number, default: 0 },
+});
 
 const UserModel = mongoose.model('User', userSchema);
 

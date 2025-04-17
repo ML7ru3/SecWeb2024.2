@@ -1,6 +1,6 @@
-import React, { useState }from 'react'
+import React, { useState } from 'react'
 import axios from 'axios';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-hot-toast'; 
 import { useNavigate } from 'react-router-dom';
 
 export default function Login() {
@@ -11,14 +11,14 @@ export default function Login() {
     })
 
     const LoginUser = async (e) => {
-        e.preventDefault();
-        const {email, password} = data;
+        e.preventDefault(); // prevents the page from reloading when the form is submitted
+        const {email, password} = data; // 1. take inputs
         try {
-            const {data} = await axios.post('/login', {
+            const {data} = await axios.post('/login', { // 2. send backend process
                 email, 
                 password
             })
-            if (data.error) {
+            if (data.error) { // 3. check error when processing inputs
                 toast.error(data.error)
             } else {
                 setData({});

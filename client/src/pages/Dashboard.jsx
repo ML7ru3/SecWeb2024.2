@@ -2,14 +2,15 @@ import { useContext, useEffect, useState } from "react";
 import cloneDeep from "lodash/cloneDeep";
 import { UserContext } from "../../context/UserContext";
 import { getColors, useEvent } from "../helper/util.js";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 export default function Dashboard() {
-    const { user } = useContext(UserContext);
+    const { setUser } = useContext(UserContext);
+    const navigate = useNavigate();
 
     const [score, setScore] = useState(0);
-    const [bestScore, setBestScore] = useState(
-        Number(localStorage.getItem("bestScore")) || 0
-    );
+    const [bestScore, setBestScore] = useState(0);
 
     const [data, setData] = useState([
         [0, 0, 0, 0],
@@ -18,436 +19,215 @@ export default function Dashboard() {
         [0, 0, 0, 0],
     ]);
 
-    // Initialize
     const initialize = () => {
-        let newGrid = cloneDeep(data); // make a copy of data
+        let newGrid = cloneDeep(data);
         setScore(0);
         addNumber(newGrid);
         addNumber(newGrid);
-        setData(newGrid); // Save to state
+        setData(newGrid);
     };
 
-    // AddNumber - Add an item
     const addNumber = (newGrid) => {
-        let added = false; // tracks if we’ve successfully added a number
-        let attempts = 0; // prevents the function from trying forever (in case grid is full)
+        let added = false;
+        let attempts = 0;
 
         while (!added && attempts < 50) {
-            let rand1 = Math.floor(Math.random() * 4); // random row (0 to 3)
-            let rand2 = Math.floor(Math.random() * 4); // random column (0 to 3) -> random coordinate
+            let rand1 = Math.floor(Math.random() * 4);
+            let rand2 = Math.floor(Math.random() * 4);
 
             if (newGrid[rand1][rand2] === 0) {
-                newGrid[rand1][rand2] = Math.random() > 0.5 ? 2 : 4; // random value
+                newGrid[rand1][rand2] = Math.random() > 0.5 ? 2 : 4;
                 added = true;
             }
 
             attempts++;
         }
 
-        if (!added) {
-            console.log("Grid is full, cannot add a new number.");
-        }
+        if (!added) console.log("Grid is full, cannot add a new number.");
     };
 
-    // Swipe Left
-    const swipeLeft = () => {
-        let oldGrid = data; // state - store the original grid to compare later
-        let newGrid = cloneDeep(data); // a deep copy to modify (never change state directly)
-
+    const swipe = (grid, reverse = false, transpose = false) => {
+        let newGrid = cloneDeep(grid);
         let newScore = score;
 
-        for (let i = 0; i < 4; i++) { // Looping through each row in the 4x4 grid
-            let b = newGrid[i];
-            let slow = 0; // pointer points to the index where we try to move or merge into
-            let fast = 1; // pointer points to the tile we're currently checking 
+        if (transpose) {
+            for (let i = 0; i < 4; i++) {
+                for (let j = i + 1; j < 4; j++) {
+                    let temp = newGrid[i][j];
+                    newGrid[i][j] = newGrid[j][i];
+                    newGrid[j][i] = temp;
+                }
+            }
+        }
+
+        for (let i = 0; i < 4; i++) {
+            let row = reverse ? newGrid[i].slice().reverse() : newGrid[i].slice();
+            let slow = 0, fast = 1;
+            while (slow < 4) {
+                if (fast === 4) {
+                    fast = ++slow + 1;
+                    continue;
+                }
+                if (row[slow] === 0 && row[fast] !== 0) {
+                    row[slow] = row[fast];
+                    row[fast] = 0;
+                } else if (row[slow] !== 0 && row[fast] === row[slow]) {
+                    row[slow] += row[fast];
+                    row[fast] = 0;
+                    newScore += row[slow];
+                    fast = ++slow + 1;
+                    continue;
+                } else if (row[fast] !== 0 && row[slow] !== 0) {
+                    slow++;
+                    fast = slow + 1;
+                    continue;
+                }
+                fast++;
+            }
+            newGrid[i] = reverse ? row.reverse() : row;
+        }
+
+        if (transpose) {
+            for (let i = 0; i < 4; i++) {
+                for (let j = i + 1; j < 4; j++) {
+                    let temp = newGrid[i][j];
+                    newGrid[i][j] = newGrid[j][i];
+                    newGrid[j][i] = temp;
+                }
+            }
+        }
+
+        if (JSON.stringify(grid) !== JSON.stringify(newGrid)) {
+            addNumber(newGrid);
+        }
+
+        setData(newGrid);
+        setScore(newScore);
+
+        if (newScore > bestScore) {
+            setBestScore(newScore);
             
-            while (slow < 4) {
-                // case 1: check if fast has gone out of bounds -> shift slow forward by one + reset fast to be just after slow -> continue the loop
-                if (fast === 4) {
-                    fast = slow + 1;
-                    slow++;
-                    continue;
-                }
-                // case 2: if both positions are 0 -> just move fast forward - nothing to do (0,0)
-                if (b[slow] === 0 && b[fast] === 0) {
-                    fast++;
-                // cse 3: slow is empty, fast has a number -> move fast tile into slow spot + clear old fast = 0 -> move fast forward (0,a) -> (a,0) -> fast++
-                } else if (b[slow] === 0 && b[fast] !== 0) { 
-                    b[slow] = b[fast];
-                    b[fast] = 0;
-                    fast++;
-                // csae 4: just move fast forward -> looking for something to merge with slow (a, 0) -> fast++
-                } else if (b[slow] !== 0 && b[fast] === 0) {
-                    fast++;
-                // case 5: both have numbers -> check if they can merge (they are the same) (a,a) -> (2a, 0) or (a,b) -> slow++, fast = slow + 1
-                } else if (b[slow] !== 0 && b[fast] !== 0) {
-                    if (b[slow] === b[fast]) {
-                        b[slow] += b[fast];
-                        b[fast] = 0;
-
-                        newScore += b[slow];
-
-                        fast = slow + 1;
-                        slow++;
-                    } else {
-                        slow++;
-                        fast = slow + 1;
-                    }
-                }
-            }
         }
 
-        if (JSON.stringify(oldGrid) !== JSON.stringify(newGrid)) {
-            addNumber(newGrid);
-        }
-        setData(newGrid);
-        setScore(newScore);
-
-        if (newScore > bestScore){
-            setBestScore(newScore);
-            localStorage.setItem("bestScore", newScore);
-        }
-
-        // Check if the game is over
         if (checkIfGameOver(newGrid)) {
             alert("Game Over!");
         }
     };
 
-    // Swipe Right
-    const swipeRight = () => {
-        let oldGrid = data;
-        let newGrid = cloneDeep(data);
-        let newScore = score;
-
-        for (let i = 0; i < 4; i++) {
-            let b = newGrid[i].reverse(); // if [2, 0, 2, 4] -> reverse(): [4, 2, 0, 2]
-            let slow = 0;
-            let fast = 1;
-            while (slow < 4) {
-                // case 1
-                if (fast === 4) {
-                    fast = slow + 1;
-                    slow++;
-                    continue;
-                }
-                // case 2: (0,0) -> fast++
-                if (b[slow] === 0 && b[fast] === 0) {
-                    fast++;
-                // case 3: (0,a) -> (a,0) -> fast++
-                } else if (b[slow] === 0 && b[fast] !== 0) {
-                    b[slow] = b[fast];
-                    b[fast] = 0;
-                    fast++;
-                // case 4: (a,0) -> fast++
-                } else if (b[slow] !== 0 && b[fast] === 0) {
-                    fast++;
-                // case 5: (a,a) -> (2a,0) or (a,b) -> slow++, fast=slow+1 (remain + check next)
-                } else if (b[slow] !== 0 && b[fast] !== 0) {
-                    if (b[slow] === b[fast]) {
-                        b[slow] += b[fast];
-                        b[fast] = 0;
-
-                        newScore += b[slow];
-
-                        fast = slow + 1;
-                        slow++;
-                    } else {
-                        slow++;
-                        fast = slow + 1;
-                    }
-                }
-            }
-            newGrid[i] = b.reverse(); // finished -> reverse again: [4, 4, 0, 0] -> [0, 0, 4, 4]
-        }
-
-        if (JSON.stringify(oldGrid) !== JSON.stringify(newGrid)) { // changed
-            addNumber(newGrid); // add a new number
-        }
-        setData(newGrid); // update new grid
-        setScore(newScore);
-
-        if (newScore > bestScore){
-            setBestScore(newScore);
-            localStorage.setItem("bestScore", newScore);
-        }
-
-        // Check if the game is over
-        if (checkIfGameOver(newGrid)) {
-            alert("Game Over!");
-        }
-    };
-    // Swipe Up
-    const swipeUp = () => {
-        let oldGrid = data;
-        let newGrid = cloneDeep(data);
-        let newScore = score;
-    
-        // Transpose the grid
-        for (let i = 0; i < 4; i++) {
-            for (let j = i + 1; j < 4; j++) {
-                let temp = newGrid[i][j];
-                newGrid[i][j] = newGrid[j][i];
-                newGrid[j][i] = temp;
-            }
-        }
-    
-        // Apply swipeLeft logic
-        for (let i = 0; i < 4; i++) {
-            let b = newGrid[i];
-            let slow = 0;
-            let fast = 1;
-            while (slow < 4) {
-                if (fast === 4) {
-                    fast = slow + 1;
-                    slow++;
-                    continue;
-                }
-                if (b[slow] === 0 && b[fast] === 0) {
-                    fast++;
-                } else if (b[slow] === 0 && b[fast] !== 0) {
-                    b[slow] = b[fast];
-                    b[fast] = 0;
-                    fast++;
-                } else if (b[slow] !== 0 && b[fast] === 0) {
-                    fast++;
-                } else if (b[slow] !== 0 && b[fast] !== 0) {
-                    if (b[slow] === b[fast]) {
-                        b[slow] += b[fast];
-                        b[fast] = 0;
-
-                        newScore += b[slow];
-
-                        fast = slow + 1;
-                        slow++;
-                    } else {
-                        slow++;
-                        fast = slow + 1;
-                    }
-                }
-            }
-        }
-    
-        // Transpose the grid back
-        for (let i = 0; i < 4; i++) {
-            for (let j = i + 1; j < 4; j++) {
-                let temp = newGrid[i][j];
-                newGrid[i][j] = newGrid[j][i];
-                newGrid[j][i] = temp;
-            }
-        }
-    
-        if (JSON.stringify(oldGrid) !== JSON.stringify(newGrid)) {
-            addNumber(newGrid);
-        }
-        setData(newGrid);
-        setScore(newScore);
-
-        if (newScore > bestScore){
-            setBestScore(newScore);
-            localStorage.setItem("bestScore", newScore);
-        }
-
-        // Check if the game is over
-        if (checkIfGameOver(newGrid)) {
-            alert("Game Over!");
-        }
+    const handleKeyDown = (e) => {
+        if (e.code === "ArrowLeft") swipe(data, false, false);
+        if (e.code === "ArrowRight") swipe(data, true, false);
+        if (e.code === "ArrowUp") swipe(data, false, true);
+        if (e.code === "ArrowDown") swipe(data, true, true);
     };
 
-    // Swipe Down
-    const swipeDown = () => {
-        let oldGrid = data;
-        let newGrid = cloneDeep(data);
-        let newScore = score;
-    
-        // Transpose the grid
-        for (let i = 0; i < 4; i++) {
-            for (let j = i + 1; j < 4; j++) {
-                let temp = newGrid[i][j];
-                newGrid[i][j] = newGrid[j][i];
-                newGrid[j][i] = temp;
-            }
-        }
-    
-        // Reverse each row
-        for (let i = 0; i < 4; i++) {
-            newGrid[i].reverse();
-        }
-    
-        // Apply swipeLeft logic
-        for (let i = 0; i < 4; i++) {
-            let b = newGrid[i];
-            let slow = 0;
-            let fast = 1;
-            while (slow < 4) {
-                if (fast === 4) {
-                    fast = slow + 1;
-                    slow++;
-                    continue;
-                }
-                if (b[slow] === 0 && b[fast] === 0) {
-                    fast++;
-                } else if (b[slow] === 0 && b[fast] !== 0) {
-                    b[slow] = b[fast];
-                    b[fast] = 0;
-                    fast++;
-                } else if (b[slow] !== 0 && b[fast] === 0) {
-                    fast++;
-                } else if (b[slow] !== 0 && b[fast] !== 0) {
-                    if (b[slow] === b[fast]) {
-                        b[slow] += b[fast];
-                        b[fast] = 0;
-
-                        newScore += b[slow];
-
-                        fast = slow + 1;
-                        slow++;
-                    } else {
-                        slow++;
-                        fast = slow + 1;
-                    }
-                }
-            }
-        }
-    
-        // Reverse each row back
-        for (let i = 0; i < 4; i++) {
-            newGrid[i].reverse();
-        }
-    
-        // Transpose the grid back
-        for (let i = 0; i < 4; i++) {
-            for (let j = i + 1; j < 4; j++) {
-                let temp = newGrid[i][j];
-                newGrid[i][j] = newGrid[j][i];
-                newGrid[j][i] = temp;
-            }
-        }
-    
-        if (JSON.stringify(oldGrid) !== JSON.stringify(newGrid)) {
-            addNumber(newGrid);
-        }
-        setData(newGrid);
-        setScore(newScore);
-
-        if (newScore > bestScore){
-            setBestScore(newScore);
-            localStorage.setItem("bestScore", newScore);
-        }
-
-        // Check if the game is over
-        if (checkIfGameOver(newGrid)) {
-            alert("Game Over!");
-        }
-    };
-
-    // Check GameOver
     const checkIfGameOver = (grid) => {
-        // Check if there are any empty cells
         for (let i = 0; i < 4; i++) {
             for (let j = 0; j < 4; j++) {
-                if (grid[i][j] === 0) {
-                    return false; // Game is not over if there is an empty cell
-                }
+                let current = grid[i][j];
+                if (current === 0) return false;
+                if (j < 3 && current === grid[i][j + 1]) return false;
+                if (i < 3 && current === grid[i + 1][j]) return false;
             }
         }
-    
-        // Check if any adjacent cells are the same (horizontally or vertically)
-        for (let i = 0; i < 4; i++) {
-            for (let j = 0; j < 4; j++) {
-                if (
-                    (i > 0 && grid[i][j] === grid[i - 1][j]) || // Check above
-                    (i < 3 && grid[i][j] === grid[i + 1][j]) || // Check below
-                    (j > 0 && grid[i][j] === grid[i][j - 1]) || // Check left
-                    (j < 3 && grid[i][j] === grid[i][j + 1])    // Check right
-                ) {
-                    return false; // Game is not over if there are adjacent cells with the same value
-                }
-            }
-        }
-    
-        return true; // Game is over if no empty cells and no adjacent cells are the same
+        return true;
     };
-    
-    // Reset
+
     const reset = () => {
-        const newGrid = [
+        const emptyGrid = [
             [0, 0, 0, 0],
             [0, 0, 0, 0],
             [0, 0, 0, 0],
             [0, 0, 0, 0],
         ];
         setScore(0);
-        addNumber(newGrid);
-        addNumber(newGrid);
-        setData(newGrid);
-    };
-    // HANDLE KEY DOWN
-    const handleKeyDown = (event) => {
-        switch (event.code) {
-            case "ArrowUp":
-                swipeUp();
-                break;
-            case "ArrowDown":
-                swipeDown();
-                break;
-            case "ArrowRight":
-                swipeRight();
-                break;
-            case "ArrowLeft":
-                swipeLeft();
-                break;
-            default:
-                break;
-        }
+        addNumber(emptyGrid);
+        addNumber(emptyGrid);
+        setData(emptyGrid);
     };
 
     useEffect(() => {
-        initialize();
+        const loadSavedGame = async () => {
+            try {
+                const res = await axios.get("/dashboard", {
+                    withCredentials: true,
+                });
+    
+                if (res.data.board) {
+                    setData(res.data.board);
+                    setScore(res.data.score || 0);
+                    setBestScore(res.data.bestScore || 0);
+                } else {
+                    initialize();
+                }
+            } catch (err) {
+                console.error("Error loading saved game:", err);
+                initialize(); 
+            }
+        };
+    
+        loadSavedGame();
     }, []);
+    
+    
     useEvent("keydown", handleKeyDown);
+
+    const handleRank = () => {
+        navigate("/rank");
+    };
+
+    const handleLogout = async () => {
+        try {
+            const res = await axios.post("/logout", {}, { withCredentials: true });
+            if (res.data.status === "success") {
+                setUser(null);
+                navigate("/");
+            } else {
+                console.error("Logout failed:", res.data.message);
+            }
+        } catch (err) {
+            console.error("Error logging out:", err);
+        }
+    };
+    const handleSaveGame = async () => {
+        try {
+            await axios.post("/dashboard", {
+                board: data,
+                score,
+                bestScore
+            }, {
+                withCredentials: true
+            });
+            alert("Game saved!");
+        } catch (err) {
+            alert("Failed to save game.");
+        }
+    };
+    
+    
 
     return (
         <div>
-            <div style={{textAlign: "center", marginTop: 10}}>
+            <div style={{ marginTop: 10 }}>
+                <button onClick={handleRank} style={buttonStyle}>Rank</button>
+                <button onClick={handleLogout} style={buttonStyle}>Logout</button>
+            </div>
+            <div style={{ textAlign: "center", marginTop: 10 }}>
                 <p>Score: {score}</p>
                 <p>Best Score: {bestScore}</p>
             </div>
-            <div 
-                style={{
-                    background: "#AD9D8F",
-                    width: "max-content",
-                    margin: "auto",
-                    padding: 5,
-                    borderRadius: 5,
-                    marginTop: 10,
-                }}
-            >
-                {data.map((row, oneIndex) => (
-                    <div style={{ display: "flex" }} key={oneIndex}>
-                        {row.map((digit, Index) => (
-                            <Block num={digit} key={Index} />
+            <div style={gridWrapperStyle}>
+                {data.map((row, rowIndex) => (
+                    <div style={{ display: "flex" }} key={rowIndex}>
+                        {row.map((digit, colIndex) => (
+                            <Block num={digit} key={colIndex} />
                         ))}
                     </div>
                 ))}
             </div>
-            <div>
-            <button
-                    onClick={reset} 
-                    style={{
-                        marginTop: 10,
-                        padding: "10px 20px",
-                        fontSize: "16px",
-                        fontWeight: "bold",
-                        background: "#8f7a66",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "5px",
-                        cursor: "pointer",
-                    }}
-                >
-                    Reset Game
-                </button>
+            <div style={{ marginBottom: 20 }}>
+                <button onClick={reset} style={buttonStyle}>Reset Game</button>
+                <button onClick={handleSaveGame} style={buttonStyle}>Save Game</button>
             </div>
         </div>
     );
@@ -457,9 +237,9 @@ const Block = ({ num }) => {
     return (
         <div
             style={{
-                ...style,
+                ...blockStyle,
                 background: getColors(num),
-                color: num === 2 || num === 4 ? "#645B" : "#FFF",
+                color: num === 2 || num === 4 ? "#645B5B" : "#FFF",
             }}
         >
             {num !== 0 ? num : ""}
@@ -467,15 +247,36 @@ const Block = ({ num }) => {
     );
 };
 
-const style = {
+const buttonStyle = {
+    marginRight: 10,
+    marginTop: 10,
+    padding: "10px 20px",
+    fontSize: "16px",
+    fontWeight: "bold",
+    background: "#8f7a66",
+    color: "white",
+    border: "none",
+    borderRadius: "5px",
+    cursor: "pointer",
+};
+
+const gridWrapperStyle = {
+    background: "#AD9D8F",
+    width: "max-content",
+    margin: "auto",
+    padding: 5,
+    borderRadius: 5,
+    marginTop: 10,
+};
+
+const blockStyle = {
     width: 80,
     height: 80,
-    background: "lightgrey",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    margin: 3,
-    fontSize: 35,
-    fontWeight: "800",
-    color: "white",
+    fontSize: 24,
+    fontWeight: "bold",
+    margin: 5,
+    borderRadius: 5,
 };
