@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const cors = require('cors');
-const { registerUser, loginUser, logout, getProfile, getAllUsers, saveGame, loadGame } = require('../controllers/authController');
+const { registerUser, loginUser, logout, getProfile, getAllUsers, saveGame, loadGame} = require('../controllers/authController');
 const {authenticateUser} = require('../helpers/auth.js');
 
 router.use(

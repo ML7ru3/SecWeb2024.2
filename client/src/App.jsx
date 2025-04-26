@@ -1,11 +1,10 @@
 import './App.css'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import NavBar from './components/NavBar'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Rank from './pages/Rank'
-import Home from './pages/Home' // You can create a simple placeholder for Home page
+import Home from './pages/Home' 
 import axios from 'axios'
 import { Toaster } from 'react-hot-toast'
 import { UserContextProvider } from '../context/UserContext'

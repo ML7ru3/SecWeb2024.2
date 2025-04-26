@@ -129,15 +129,33 @@ const getAllUsers = async (req, res) => {
 const loadGame = async (req, res) => {
     try {
         const user = req.user;
+        const action = req.query.action; // Can be 'load' or 'reset'
 
-        res.json({
-            board: user.savedBoard,
-            score: user.score,
-            bestScore: user.bestScore,
-        });
+        if (action === 'load') {
+            // Load the saved game state
+            return res.json({
+                board: user.savedBoard,
+                score: user.score,
+                bestScore: user.bestScore,
+            });
+        } else if (action === 'reset') {
+            // Reset the game state
+            user.savedBoard = [
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+                [0, 0, 0, 0],
+            ];
+            user.score = 0;
+            await user.save();
+            return res.status(200).json({ message: "Game state has been reset." });
+        } else {
+            // If no valid action is provided
+            return res.status(400).json({ message: "Invalid action. Use 'load' or 'reset'." });
+        }
     } catch (err) {
-        console.error("Error loading game:", err);
-        res.status(500).json({ message: "Error loading game." });
+        console.error("Error handling game:", err);
+        return res.status(500).json({ message: "Error handling game state." });
     }
 };
 
@@ -157,6 +175,8 @@ const saveGame = async (req, res) => {
         res.status(500).json({ message: "Error saving game." });
     }
 };
+
+
 module.exports = {
     registerUser,
     loginUser,

@@ -133,7 +133,7 @@ export default function Dashboard() {
         return true;
     };
 
-    const reset = () => {
+    const reset = async () => {
         const emptyGrid = [
             [0, 0, 0, 0],
             [0, 0, 0, 0],
@@ -150,6 +150,10 @@ export default function Dashboard() {
         const loadSavedGame = async () => {
             try {
                 const res = await axios.get("/dashboard", {
+                    params: {
+                        action: 'load',
+                        reset: true,
+                    },
                     withCredentials: true,
                 });
     
