@@ -21,6 +21,7 @@ function App() {
   }, []); 
 
   return (
+    <React.StrictMode>
     <UserContextProvider>
       <Header />
       <Toaster position='bottom-right' toastOptions={{ duration: 2000 }} />
@@ -32,6 +33,7 @@ function App() {
         </Routes>
       <Footer />
     </UserContextProvider>
+    </React.StrictMode>
   )
 }
 
