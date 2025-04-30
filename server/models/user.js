@@ -7,6 +7,18 @@ const userSchema = new Schema({
         type: String,
         unique: true
     },
+    scoreFromLastGameSaved: {
+        type: Number,
+        default: null 
+    },
+    lastGameSaved: {
+        type: Array,
+        default: null
+    },
+    highscore: {
+        type: Number,
+        default: 0
+    },
     password: String
 }); 
 

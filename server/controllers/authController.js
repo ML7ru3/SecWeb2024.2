@@ -46,6 +46,38 @@ const registerUser = async (req, res) => {
     }
 }
 
+const updateUser = async (req, res) => {
+    try {
+        const { email, lastGameSaved, scoreFromLastGameSaved, newHighScore } = req.body;
+
+        // Validate input
+        if (!email || !lastGameSaved) {
+            return res.status(400).json({ error: 'Email and lastGameSaved are required' });
+        }
+
+        // Find the user
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Update the user's highscore
+        const highscore = Math.max(user.highscore || 0, newHighScore || 0);
+
+        // Update the user
+        const updatedUser = await User.findOneAndUpdate(
+            { email }, // Match the user by email
+            { $set: { lastGameSaved, scoreFromLastGameSaved, highscore } }, // Update fields
+            { new: true } // Return the updated document
+        );
+
+        return res.json(updatedUser); // Return the updated user
+    } catch (err) {
+        console.error('Error in updateUser:', err);
+        return res.status(500).json({ error: 'Server error' });
+    }
+};
+
 const loginUser = async (req, res) => {
     try {
         const {email, password} = req.body;
@@ -111,5 +143,6 @@ module.exports = {
     registerUser,
     loginUser,
     getProfile, 
-    logoutUser
+    logoutUser,
+    updateUser
 }

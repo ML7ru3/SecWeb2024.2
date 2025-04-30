@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const cors = require('cors');
-const { test, registerUser, loginUser, getProfile, logoutUser } = require('../controllers/authController');
+const { test, registerUser, loginUser, getProfile, logoutUser, updateUser } = require('../controllers/authController');
 const { requireAuth } = require('../helpers/auth');
 
 router.use(
@@ -16,5 +16,6 @@ router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.get('/profile', getProfile, requireAuth);
 router.post('/logout', logoutUser);
+router.put('/update', updateUser);
 
 module.exports = router;
