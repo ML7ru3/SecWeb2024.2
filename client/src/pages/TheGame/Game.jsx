@@ -1,13 +1,13 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useContext} from 'react';
 import './Game.css';
 import { GameContext } from '../Gameboard'; 
+import { UserContext } from '../../../context/UserContext';
 
 
 
 
 export default function Game() {
-    const [cellValues, setCellValues] = useState(Array(4).fill(null).map(() => Array(4).fill('')));
-    const  [incrementScore, initialized, setInitialized]  = useContext(GameContext);
+    const  [incrementScore, initialized, setInitialized, cellValues, setCellValues]  = useContext(GameContext);   
 
     const randomNumberGenerator = () => {
         setCellValues((prevCellValues) => {

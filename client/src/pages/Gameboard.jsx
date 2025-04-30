@@ -1,10 +1,10 @@
-import { createContext, useContext, useEffect, useState} from 'react';
+import { createContext, useContext, useEffect, useState, useRef} from 'react';
 import { UserContext } from '../../context/UserContext.jsx';
 import toast from 'react-hot-toast';
 import NewGameButton from '../components/NewGameButton';
 import '../styles/Gameboard.css';
 import Game from './TheGame/Game.jsx'
-
+import axios from 'axios'
 
 export const GameContext = createContext(null);
 
@@ -15,24 +15,62 @@ export default function GameBoard() {
   const [bestUserScore, setBestUserScore] = useState(0);
   const [userScore, setUserScore] = useState(0);
   const [initialized, setInitialized] = useState(false);
+  const [cellValues, setCellValues] = useState(Array(4).fill(null).map(() => Array(4).fill('')));
+  const isLogin = useRef(false);
+
 
   const incrementScore = (points) => {
     setUserScore((prevScore) => prevScore + points);
   };
+
+  async function saveUser() {
+    try {
+        // Prepare the updated data
+        const updatedData = {
+            email: user.email, 
+            lastGameSaved: cellValues, 
+            scoreFromLastGameSaved: userScore,
+            newHighScore: bestUserScore
+        };
+
+        // Send the PUT request to update the user
+        const res = await axios.put('/update', updatedData);
+
+        // Handle the response
+        if (res.data.error) {
+            toast.error(res.data.error); // Show error message if the backend returns an error
+        } else {
+            toast.success('Game saved successfully!'); // Show success message
+        }
+    } catch (err) {
+        console.error('Error saving user:', err);
+        toast.error('Failed to save game. Please try again.');
+    }
+}
 
   const handleSaveGame = () => {
     if (!user) {
       toast.error('You need to login to save game!');
       return;
     }
-    // TODO: Save game data
+    saveUser();
     toast.success('Game saved!');
   };
   
   useEffect(() => {
-    console.log(initialized)
+    //load the last game session
     setBestUserScore(Math.max(bestUserScore, userScore));
-  }, [userScore, initialized]);
+    if (user && !isLogin.current){
+      if (user.lastGameSaved) {
+          setCellValues(() => user.lastGameSaved);
+          setUserScore(() => user.scoreFromLastGameSaved);
+          setBestUserScore(() => user.highscore);
+      }
+      isLogin.current = true;
+      setInitialized(true);
+    } 
+
+  }, [userScore, user]);
 
   function resetGame() {
     setInitialized(false);
@@ -66,7 +104,7 @@ export default function GameBoard() {
       </div>
 
       {/*Here's the gameplay*/}
-      <GameContext.Provider value = {[incrementScore, initialized, setInitialized]} >
+      <GameContext.Provider value = {[incrementScore, initialized, setInitialized, cellValues, setCellValues]} >
           <Game />
       </GameContext.Provider>
 
