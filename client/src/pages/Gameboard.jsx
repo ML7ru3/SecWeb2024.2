@@ -60,15 +60,19 @@ export default function GameBoard() {
   useEffect(() => {
     //load the last game session
     setBestUserScore(Math.max(bestUserScore, userScore));
-    if (user && !isLogin.current){
-      if (user.lastGameSaved) {
-          setCellValues(() => user.lastGameSaved);
-          setUserScore(() => user.scoreFromLastGameSaved);
-          setBestUserScore(() => user.highscore);
-      }
-      isLogin.current = true;
-      setInitialized(true);
-    } 
+
+    const loadLastGameSession = async () => {
+      if (user && !isLogin.current){
+        if (user.lastGameSaved) {
+            await setCellValues(() => user.lastGameSaved);
+            await setUserScore(() => user.scoreFromLastGameSaved);
+            await setBestUserScore(() => user.highscore);
+        }
+        isLogin.current = true;
+        setInitialized(true);
+      } 
+    }
+    loadLastGameSession();
 
   }, [userScore, user]);
 
