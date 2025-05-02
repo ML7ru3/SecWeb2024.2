@@ -110,5 +110,26 @@ body {
   }
   
 
+  .back-admin-button {
+    position: absolute;
+    top: 100px;
+    left: 20px;
+    padding: 12px 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #ffcad4, #fcd5ce, #d8e2dc);
+    color: #2d2d2d;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    z-index: 10;
+  }
   
+  .back-admin-button:hover {
+    transform: scale(1.05);
+    background: linear-gradient(135deg, #ffc8dd, #e2f0cb, #bde0fe);
+  }
   

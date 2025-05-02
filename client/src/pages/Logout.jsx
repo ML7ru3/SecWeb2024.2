@@ -39,6 +39,7 @@ export default function Logout() {
             try {
                 await axios.post('/logout');
                 setUser(null);
+                localStorage.setItem("logout", Date.now());
                 toast.success("Đăng xuất thành công!");
                 navigate("/login");
             } catch (err) {

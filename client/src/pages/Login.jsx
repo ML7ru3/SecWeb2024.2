@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { UserContext } from '../../context/UserContext';
 import '../styles/Login.css';
 
@@ -17,7 +17,11 @@ export default function Login() {
     // check out login if user is logged in
     useEffect(() => {
         if (user) {
-            navigate('/gameboard'); 
+            if (user.role === 'admin') {
+                navigate('/admin/dashboard');
+            } else {
+                navigate('/gameboard');
+            }
         }
     }, [user, navigate]);
 
@@ -34,7 +38,13 @@ export default function Login() {
                 setUser(profileRes.data);
                 toast.success("Login successful!");
                 setData({ email: '', password: '' });
-                navigate('/gameboard');
+
+                // navigate based on role
+                if (profileRes.data.role === 'admin') {
+                    navigate('/admin/dashboard');
+                } else {
+                    navigate('/gameboard');
+                }
             }
         } catch (error) {
             console.error(error);
@@ -66,6 +76,10 @@ export default function Login() {
                     onChange={(e) => setData({ ...data, password: e.target.value })}
                     required
                 />
+
+                <div>
+                    <Link to="/forgot-password" className="forgot-password-link">Forgot Password?</Link>
+                </div>
 
                 <button type="submit">Login</button>
             </form>

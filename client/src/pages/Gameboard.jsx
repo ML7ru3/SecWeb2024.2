@@ -5,6 +5,8 @@ import NewGameButton from '../components/NewGameButton';
 import '../styles/Gameboard.css';
 import Game from './TheGame/Game.jsx'
 import axios from 'axios'
+import { useNavigate } from 'react-router-dom';
+
 
 export const GameContext = createContext(null);
 
@@ -17,6 +19,8 @@ export default function GameBoard() {
   const [initialized, setInitialized] = useState(false);
   const [cellValues, setCellValues] = useState(Array(4).fill(null).map(() => Array(4).fill('')));
   const isLogin = useRef(false);
+  const navigate = useNavigate();
+
 
 
   const incrementScore = (points) => {
@@ -84,39 +88,50 @@ export default function GameBoard() {
 
 
   return (
-    <div className="gameboard">
-      <div className="gameboard-header">
-        <div className="left-info">
-          <h2 className="game-title">2048</h2>
-          {user && (
-            <div className="welcome-user">
-              Hi, <strong>{user.name}</strong>
-            </div>
-          )}
-        </div>
-
-        <div className="score-group">
-          <div className="score-box">
-            <div>Score</div>
-            <div>{userScore}</div>
-          </div>
-          <div className="score-box">
-            <div>Best</div>
-            <div>{bestUserScore}</div>
-          </div>
-        </div>
-      </div>
-
-      {/*Here's the gameplay*/}
-      <GameContext.Provider value = {[incrementScore, initialized, setInitialized, cellValues, setCellValues]} >
-          <Game />
-      </GameContext.Provider>
-
-      <div className="button-group">
-        <NewGameButton onNewGame={resetGame}  />
-        <button className="button" onClick={handleSaveGame}>
-          Save Game
+    <div>
+      {user?.role === 'admin' && (
+        <button
+          className="back-admin-button"
+          onClick={() => navigate('/admin/dashboard')}
+        >
+          Go to Admin Dashboard
         </button>
+      )}
+
+      <div className="gameboard">
+        <div className="gameboard-header">
+          <div className="left-info">
+            <h2 className="game-title">2048</h2>
+            {user && (
+              <div className="welcome-user">
+                Hi, <strong>{user.name}</strong>
+              </div>
+            )}
+          </div>
+
+          <div className="score-group">
+            <div className="score-box">
+              <div>Score</div>
+              <div>{userScore}</div>
+            </div>
+            <div className="score-box">
+              <div>Best</div>
+              <div>{bestUserScore}</div>
+            </div>
+          </div>
+        </div>
+
+        {/*Here's the gameplay*/}
+        <GameContext.Provider value = {[incrementScore, initialized, setInitialized, cellValues, setCellValues]} >
+            <Game />
+        </GameContext.Provider>
+
+        <div className="button-group">
+          <NewGameButton onNewGame={resetGame}  />
+          <button className="button" onClick={handleSaveGame}>
+            Save Game
+          </button>
+        </div>
       </div>
     </div>
   );

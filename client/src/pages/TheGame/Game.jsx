@@ -170,9 +170,10 @@ export default function Game() {
     for (let i = 0; i < 4; i++) {
         for (let j = 0; j < 4; j++) {
             cells.push(
-                <div className="cell">
+                <div className={`cell value-${cellValues[i][j] || 0}`} key={`${i}-${j}`}>
                     {cellValues[i][j]}
                 </div>
+
             );
         }
     }

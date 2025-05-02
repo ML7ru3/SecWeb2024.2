@@ -1,5 +1,7 @@
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const User = require('../models/user');
+
 
 const hashPassword = (password) => {
     return new Promise((resolve, reject) => {
@@ -38,8 +40,24 @@ const requireAuth = (req, res, next) => {
     });
 };
 
+const requireAdmin = (req, res, next) => {
+    const { token } = req.cookies;
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+    jwt.verify(token, process.env.JWT_SECRET, {}, async (err, decoded) => {
+        if (err) return res.status(403).json({ error: 'Invalid token' });
+
+        const user = await User.findById(decoded.id);
+        if (!user || user.role !== 'admin') {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+        next();
+    });
+};
+
 module.exports = {
     hashPassword,
     comparePassword,
-    requireAuth
+    requireAuth,
+    requireAdmin
 }
