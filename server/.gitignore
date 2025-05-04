@@ -1,0 +1,41 @@
+# Thư mục dependencies
+node_modules/
+
+# File khóa phiên bản
+package-lock.json
+yarn.lock
+
+# Biến môi trường & thông tin nhạy cảm
+.env
+.env.local
+*.key
+*.pem
+*.cert
+*.crt
+
+# Logs và cache
+*.log
+logs/
+.npm/
+.eslintcache
+
+# File build/compiled
+dist/
+coverage/
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Hệ điều hành
+.DS_Store
+Thumbs.db
+
+# Database (nếu có)
+*.db
+*.sqlite
+dump.rdb
+
+createAdmin.js

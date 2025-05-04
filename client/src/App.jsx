@@ -12,7 +12,8 @@ import { Toaster } from 'react-hot-toast';
 import { UserContextProvider, UserContext } from '../context/UserContext.jsx';
 import React, { useContext, useEffect } from 'react';
 
-axios.defaults.baseURL = 'http://localhost:8000';
+// Cập nhật baseURL từ biến môi trường
+axios.defaults.baseURL = import.meta.env.VITE_API_URL;
 axios.defaults.withCredentials = true;
 
 function App() {
@@ -31,9 +32,32 @@ function MainApp() {
 
   useEffect(() => {
     document.title = "2048";
-  }, []);
 
-  // 👇 Thêm đoạn useEffect này để đồng bộ logout giữa các tab
+    // Chỉ redirect nếu truy cập các route yêu cầu đăng nhập
+    if (!user && ['/admin/dashboard'].includes(window.location.pathname)) {
+      navigate('/login');
+    }
+    
+    // Xử lý lỗi 401
+    const responseInterceptor = axios.interceptors.response.use(
+      response => response,
+      error => {
+        if (error.response?.status === 401) {
+          setUser(null);
+          if (window.location.pathname.startsWith('/admin')) {
+            navigate('/login');
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      axios.interceptors.response.eject(responseInterceptor);
+    };
+  }, [navigate, setUser, user]);
+
+  // Xử lý đồng bộ logout giữa các tab
   useEffect(() => {
     const handleStorage = (event) => {
       if (event.key === "logout") {

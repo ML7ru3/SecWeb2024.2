@@ -1,24 +1,31 @@
-# Logs
-logs
+# Thư mục dependencies
+node_modules/
+
+# File khóa phiên bản package (có thể tạo lại)
+package-lock.json
+yarn.lock
+
+# Biến môi trường
+.env
+.env.local
+.env.development
+.env.production
+
+# File build
+dist/
+build/
+
+# Cache và log
+.npm
+.eslintcache
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# Hệ điều hành
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+Thumbs.db
