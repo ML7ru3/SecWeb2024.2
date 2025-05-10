@@ -23,22 +23,25 @@ const hashPassword = (password) => {
 const comparePassword = (password, hashed) => {
     return bcrypt.compare(password, hashed)
 }
-
 const requireAuth = (req, res, next) => {
     const token = req.cookies.token;
 
-    if (!token) {
-        return res.status(401).json({ error: 'No tokens' });
-    }
+
+    if (!token) 
+        return res.status(401).json({ error: 'Unauthorized'});
 
     jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-        if (err) {
-            return res.status(401).json({ error: 'Invalid Token' });
+        if (err){
+            if (err.name === 'TokenExpiredError')
+                return res.status(401).json({ error: 'Session expired! Please login again!'})
+            return res.status(401).json({error: 'Invalid token'})
         }
-        req.user = decoded; // Attach the decoded token to the request object
+
+        req.user = decoded;
         next();
     });
-};
+}
+;
 
 const requireAdmin = (req, res, next) => {
     const { token } = req.cookies;

@@ -25,8 +25,9 @@ export default function Register() {
     const RegisterUser = async (e) => {
         e.preventDefault();
         const { name, email, password } = data;
+        const lastSession = JSON.parse(localStorage.getItem('guestGameState'));
         try {
-            const { data } = await axios.post('/register', { name, email, password });
+            const { data } = await axios.post('/register', { name, email, password, lastSession});
             if (data.error) {
                 toast.error(data.error);
             } else {

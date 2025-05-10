@@ -31,9 +31,17 @@ export default function Game() {
     //TODO: Implement swiping for mobile phone
 
     const handleKeyPress = (event) => {
+        const validKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+
+        // Check if the pressed key is valid
+        if (!validKeys.includes(event.key)) {
+            return; // Exit early if the key is not valid
+        }
+
+        
         setCellValues((prevCellValues) => {
             let newCellValues = prevCellValues.map(row => [...row]); // Proper deep copy of the grid
-    
+        
             switch (event.key) {
                 case 'ArrowUp':
                     for (let j = 0; j < 4; j++) {

@@ -1,6 +1,7 @@
 const User = require('../models/user');
 const { hashPassword, comparePassword } = require('../helpers/auth');
 const jwt = require('jsonwebtoken');
+const sanitizeHtml = require('sanitize-html')
 
 const test = (req, res) => {
     res.json({
@@ -10,7 +11,7 @@ const test = (req, res) => {
 
 const registerUser = async (req, res) => {
     try {   
-        const { name, email, password } = req.body;
+        const { name, email, password, lastSession } = req.body;
         //check if name was entered
         if(!name) {
             return res.json({
@@ -37,6 +38,9 @@ const registerUser = async (req, res) => {
             name, 
             email, 
             password: hashedPassword,
+            lastGameSaved: lastSession.gameState,
+            score: lastSession.tempScore,
+            scoreFromLastGameSaved: lastSession.tempHighscore
         })
 
         return res.json(user)
@@ -88,23 +92,32 @@ const loginUser = async (req, res) => {
             })
         }
         const match = await comparePassword(password, user.password)
-        if (match) {
-            jwt.sign({email: user.email, id: user._id, name: user.name}, process.env.JWT_SECRET, {}, (err, token) => {
-                if (err) throw err;
-                res.cookie('token', token).json(user);
-            })
-        }
+
         if (!match) {
-            res.json({
-                error: 'Invalid password'
-            })
+            res.json({error: 'Invalid password'});
+            return;
         }
+
+        const token = jwt.sign(
+            {email: user.email, id: user._id, name:user.name}, 
+            process.env.JWT_SECRET, 
+            {expiresIn: '1h'}
+        )
+        
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 3600000,
+        });
+
+        res.json({message: 'Login successfully', user});
 
     } catch (error) {
         console.log(error);
     }
 
 }
+
 
 const getProfile = async (req, res) => {
     const { token } = req.cookies;
@@ -123,6 +136,8 @@ const getProfile = async (req, res) => {
             if (!user) {
                 return res.status(404).json({ error: 'User does not exist' });
             }
+
+            user.name = sanitizeHtml(user.name);            
             res.json(user);
         } catch (error) {
             console.error(error);
