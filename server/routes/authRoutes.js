@@ -14,11 +14,12 @@ router.use(
 router.get('/', test);
 router.post('/register', registerUser);
 router.post('/login', loginUser);
-router.get('/profile', getProfile, requireAuth);
+router.get('/profile', requireAuth, getProfile);
 router.post('/logout', logoutUser);
-router.put('/update', updateUser);
+router.put('/update', requireAuth, updateUser);
 
 router.use('/admin', requireAuth, requireAdmin); 
+
 router.get('/admin/users', getAllUsers);                     
 router.delete('/admin/users/:id', deleteUser);               
 router.put('/admin/users/:id/reset-score', resetUserScore); 

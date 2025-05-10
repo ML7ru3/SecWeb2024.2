@@ -8,6 +8,7 @@ import axios from 'axios'
 import { useNavigate } from 'react-router-dom';
 
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const GameContext = createContext(null);
 
 
@@ -65,20 +66,32 @@ export default function GameBoard() {
     //load the last game session
     setBestUserScore(Math.max(bestUserScore, userScore));
 
-    const loadLastGameSession = async () => {
+    //for the user
+    const loadLastGameSession = () => {
       if (user && !isLogin.current){
         if (user.lastGameSaved) {
-            await setCellValues(() => user.lastGameSaved);
-            await setUserScore(() => user.scoreFromLastGameSaved);
-            await setBestUserScore(() => user.highscore);
+            setCellValues(() => user.lastGameSaved);
+            setUserScore(() => user.scoreFromLastGameSaved);
+            setBestUserScore(() => user.highscore);
         }
         isLogin.current = true;
         setInitialized(true);
       } 
     }
-    loadLastGameSession();
 
-  }, [userScore, user]);
+    //for the anonymous
+    const continuouslySaveGame = () => {
+      if (user) return;
+      localStorage.setItem('guestGameState', JSON.stringify({
+        gameState: cellValues,
+        tempScore: userScore,
+        tempHighscore: bestUserScore,
+      }));
+    }
+    loadLastGameSession();
+    continuouslySaveGame();
+
+  }, [userScore, user, bestUserScore, cellValues]);
 
   function resetGame() {
     setInitialized(false);
