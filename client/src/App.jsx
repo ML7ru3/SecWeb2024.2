@@ -163,16 +163,8 @@ function MainApp() {
       <Header />
       <Toaster position="bottom-right" toastOptions={{ duration: 2000 }} />
       <Routes>
-        <Route path="/" element={
-          <ProtectedComponent>
-            <Gameboard safeApiCall={safeApiCall} />
-          </ProtectedComponent>
-        } />
-        <Route path="/gameboard" element={
-          <ProtectedComponent>
-            <Gameboard safeApiCall={safeApiCall} />
-          </ProtectedComponent>
-        } />
+        <Route path="/" element={<Gameboard safeApiCall={safeApiCall} />} />
+        <Route path="/gameboard" element={<Gameboard safeApiCall={safeApiCall} />} />
         <Route path="/register" element={<Register safeApiCall={safeApiCall} />} />
         <Route path="/login" element={<Login safeApiCall={safeApiCall} />} />
         <Route path="/forgot-password" element={<ForgotPassword safeApiCall={safeApiCall} />} />
