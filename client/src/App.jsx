@@ -12,7 +12,7 @@ import { Toaster } from 'react-hot-toast';
 import { UserContextProvider, UserContext } from '../context/UserContext.jsx';
 import React, { useContext, useEffect } from 'react';
 
-axios.defaults.baseURL = 'http://localhost:8000';
+axios.defaults.baseURL = 'https://secweb2024-2.onrender.com';
 axios.defaults.withCredentials = true;
 
 function App() {
