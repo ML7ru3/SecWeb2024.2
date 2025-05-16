@@ -28,7 +28,7 @@ app.use(express.urlencoded({ extended: false, limit: '10kb' }));
 // Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 phút
-  max: 100, // 100 requests/IP
+  max: 50, // 50 requests/IP
   message: 'Too many requests from this IP, please try again later',
   headers: true
 });
@@ -37,13 +37,43 @@ const limiter = rateLimit({
 const speedLimiter = slowDown({
   windowMs: 15 * 60 * 1000,
   delayAfter: 50,
-  delayMs: (used, req) => (used - req.slowDown.limit) * 500,
+  delayMs: (used, req) => (used - req.slowDown.limit) * 1000,
   validate: { delayMs: false } // Tắt cảnh báo
 });
 
+const loginLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 phút
+  max: 10, // 10 yêu cầu
+  message: 'Too many login attempts, please try again after 5 minutes'
+});
+
+
 // Áp dụng limiters
-app.use('/api/', limiter);
-app.use('/api/', speedLimiter);
+app.use('/api/', limiter, speedLimiter);
+app.use('/api/login', loginLimiter);
+
+//timeout
+const timeout = require('express-timeout-handler');
+app.use(
+  timeout.handler({
+    timeout: 30000, // 30 giây
+    onTimeout: (req, res) => {
+      res.status(503).json({ message: 'Request timed out, please try again later' });
+    }
+  })
+);
+
+//cookie security
+app.use(cookieParser());
+app.use((req, res, next) => {
+  res.cookie('auth_token', 'token_value', {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict',
+    maxAge: 24 * 60 * 60 * 1000 // 1 ngày
+  });
+  next();
+});
 
 // CORS Configuration
 const corsOptions = {
@@ -74,9 +104,9 @@ const sslOptions = {
 const PORT = process.env.PORT || 8000;
 const server = https.createServer(sslOptions, app);
 
-// Server timeout (10 phút)
-server.keepAliveTimeout = 60000 * 10;
-server.headersTimeout = 60000 * 10;
+// Server timeout
+server.keepAliveTimeout = 60000 ;
+server.headersTimeout = 60000;
 
 server.listen(PORT, () => {
   console.log(`
@@ -101,8 +131,10 @@ if (PORT === 443 || PORT === 80) {
 // Process handlers
 process.on('unhandledRejection', (err) => {
   console.error('Unhandled Rejection:', err);
+  server.close(() => process.exit(1));
 });
 
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
+  server.close(() => process.exit(1));
 });

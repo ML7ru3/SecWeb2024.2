@@ -14,7 +14,7 @@ export default function Login() {
         password: '',
     });
 
-    // check out login if user is logged in
+    // Check if user is logged in
     useEffect(() => {
         if (user) {
             if (user.role === 'admin') {
@@ -28,8 +28,15 @@ export default function Login() {
     const LoginUser = async (e) => {
         e.preventDefault();
         const { email, password } = data;
+        // Get Turnstile token from the widget
+        const turnstileToken = e.target.querySelector('[name="cf-turnstile-response"]')?.value;
+        if (!turnstileToken) {
+            toast.error("Please complete the Turnstile challenge");
+            return;
+        }
+
         try {
-            const res = await axios.post('/login', { email, password });
+            const res = await axios.post('/login', { email, password, turnstileToken });
 
             if (res.data.error) {
                 toast.error(res.data.error);
@@ -39,7 +46,7 @@ export default function Login() {
                 toast.success("Login successful!");
                 setData({ email: '', password: '' });
 
-                // navigate based on role
+                // Navigate based on role
                 if (profileRes.data.role === 'admin') {
                     navigate('/admin/dashboard');
                 } else {
@@ -54,6 +61,8 @@ export default function Login() {
 
     return (
         <div className="login-container">
+            {/* Load Turnstile script */}
+            <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
             <form className="login-form" onSubmit={LoginUser}>
                 <h2>Login</h2>
 
@@ -76,6 +85,13 @@ export default function Login() {
                     onChange={(e) => setData({ ...data, password: e.target.value })}
                     required
                 />
+
+                {/* Add Turnstile widget */}
+                <div
+                    className="cf-turnstile"
+                    data-sitekey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+                    data-callback="onTurnstileSuccess"
+                ></div>
 
                 <div>
                     <Link to="/forgot-password" className="forgot-password-link">Forgot Password?</Link>

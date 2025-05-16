@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
-
+const rateLimit = require('express-rate-limit');
 
 const hashPassword = (password) => {
     return new Promise((resolve, reject) => {
@@ -42,29 +42,20 @@ const requireAuth = (req, res, next) => {
 
 const requireAdmin = async (req, res, next) => {
     try {
-        // 1. Check token
-        const { token } = req.cookies;
-        if (!token) {
-            return res.status(401).json({ error: 'Unauthorized - No token provided' });
+        // req.user đã được gắn bởi requireAuth
+        if (!req.user) {
+            return res.status(401).json({ error: 'Unauthorized - No user data' });
         }
-        // 2. Token authentication
-        const decoded = await new Promise((resolve, reject) => {
-            jwt.verify(token, process.env.JWT_SECRET, {}, (err, decoded) => {
-                if (err) reject(err);
-                else resolve(decoded);
-            });
-        });
-        // 3. Check user role
-        const user = await User.findById(decoded.id).select('role');
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+        // Kiểm tra role từ req.user (từ token)
+        if (req.user.role !== 'admin') {
+            // Xác minh thêm từ database để đảm bảo
+            const user = await User.findById(req.user.id).select('role');
+            if (!user || user.role !== 'admin') {
+                return res.status(403).json({ error: 'Forbidden - Admin access required' });
+            }
+            // Cập nhật req.user.role nếu cần
+            req.user.role = user.role;
         }
-        if (user.role !== 'admin') {
-            return res.status(403).json({ error: 'Forbidden - Admin access required' });
-        }
-        // Save user information in the request for use in subsequent middleware
-        req.user = user;
-
         next();
     } catch (error) {
         console.error('Admin middleware error:', error);
@@ -78,9 +69,37 @@ const requireAdmin = async (req, res, next) => {
     }
 };
 
+const registerLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 phút
+    max: 5, // 5 yêu cầu
+    message: 'Too many registration attempts, please try again after 5 minutes'
+});
+
+const loginLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 phút
+    max: 10, // 10 yêu cầu
+    message: 'Too many login attempts, please try again after 5 minutes'
+});
+
+const adminUsersLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 phút
+    max: 30, // 30 yêu cầu
+    message: 'Too many requests to admin endpoints, please try again later'
+});
+
+const updateLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 phút
+    max: 10, // 10 yêu cầu
+    message: 'Too many update attempts, please try again after 5 minutes'
+});
+
 module.exports = {
     hashPassword,
     comparePassword,
     requireAuth,
-    requireAdmin
+    requireAdmin,
+    registerLimiter,
+    loginLimiter,
+    adminUsersLimiter,
+    updateLimiter,
 }
