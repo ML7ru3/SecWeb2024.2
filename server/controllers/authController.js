@@ -52,9 +52,6 @@ const registerUser = async (req, res) => {
             name, 
             email, 
             password: hashedPassword,
-            lastGameSaved: lastSession.gameState,
-            score: lastSession.tempScore,
-            scoreFromLastGameSaved: lastSession.tempHighscore
         })
 
         return res.json(user);

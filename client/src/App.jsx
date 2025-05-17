@@ -13,7 +13,7 @@ import { UserContextProvider, UserContext } from '../context/UserContext.jsx';
 import React, { useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { debounce, throttle } from 'lodash';
 
-axios.defaults.baseURL = 'https://secweb2024-2.onrender.com';
+axios.defaults.baseURL = import.meta.env.VITE_API_URL;
 axios.defaults.withCredentials = true;
 axios.defaults.timeout = 10000; // 10 giây
 
