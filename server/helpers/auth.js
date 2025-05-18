@@ -1,7 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken'); // used for creating and verifying JWT tokens
 
-const hashPassword = (password) => { // defines an arrow function 'hashPassword' that takes a plain-text 'password' as input
+const hashPassword = (password) => { 
     return new Promise((resolve, reject) => {
         bcrypt.genSalt(12, (err, salt) => {
             if (err) {

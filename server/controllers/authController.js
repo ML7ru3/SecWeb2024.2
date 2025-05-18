@@ -8,7 +8,7 @@ require('dotenv').config();
 
 const test = (req, res) => {
     res.json({
-        message: 'Hello from the server!'
+        error: 'Hello from the server!'
     });
 }
 
@@ -17,26 +17,32 @@ const registerUser = async (req, res) => {
         const { name, email, password } = req.body;
         //check if name was entered
         if(!name) {
-            return res.status(400).json({
-                message: 'User not found'
+            return res.json({
+                error: 'Name is required.'
             })
         }
-        // check password presence and strength
-        const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[\W_]).{8,64}$/;
-        
-        //check is password is good
-        if(!passwordRegex.test(password)){
-            return res.status(400).json({
-                error: 'Password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one number, and one special character.'
-            });
+        if (!email){
+            return res.json({error: 'Email is required.'});
+        }
+        if (!password) {
+            return res.json({ error: 'Password is required' });
         }
         
         //Check email
         const exist = await User.findOne({ email });
         if(exist) {
-            return res.status(400).json({
-                error: 'If your email exists in our system, an OTP has been sent.'
+            return res.json({
+                error: 'Email already existed.'
             })
+        }
+        // check password presence and strength
+        const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,64}$/;
+        
+        //check is password is good
+        if(!passwordRegex.test(password)){
+            return res.json({
+                error: 'Password must be at least 6 characters long and include at least one uppercase letter, one lowercase letter and one number.'
+            });   
         }
 
         const hashedPassword = await hashPassword(password);
@@ -47,15 +53,15 @@ const registerUser = async (req, res) => {
             password: hashedPassword,
         })
 
-        return res.status(200).json({
+        return res.json({
             id: user._id,
             name: user.name,
             email: user.email,
-            highscore: user.highscore || 0,
+            highscore: user.highscore || 0
         });
         
     } catch (err){
-        return res.status(500).json({message: 'Internal server error'});
+        return res.json({error: 'Internal server error'});
     }
 }
 
@@ -64,30 +70,28 @@ const loginUser = async (req, res) => {
         const {email, password} = req.body;
         const user = await User.findOne({email});
         if (!user) {
-            return res.status(403).json({
-                message: 'Invalid email or password'
-            })
-        }
-        const match = await comparePassword(password, user.password)
-        if (match) {
-            jwt.sign({email: user.email, id: user._id, name: user.name}, process.env.JWT_SECRET, {}, (err, token) => {
-                if (err) throw err;
-                res.status(200).cookie('token', token).json({
-                    id: user._id,
-                    name: user.name,
-                    email: user.email,
-                    highscore: user.highscore || 0
-                });
-            })
-        }
-        if (!match) {
-            res.status(403).json({
+            return res.json({
                 error: 'Invalid email or password'
             })
         }
-
+        const match = await comparePassword(password, user.password)
+        if (!match) {
+            return res.json({
+                error: 'Invalid email or password'
+            })
+        }
+        
+        jwt.sign({email: user.email, id: user._id, name: user.name}, process.env.JWT_SECRET, {}, (err, token) => {
+            if (err) throw err;
+            res.status(200).cookie('token', token).json({
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                highscore: user.highscore || 0
+            });
+        })
     } catch (error) {
-        return res.status(500).json({message: 'Internal server error'})
+        return res.status(500).json({error: 'Internal server error'})
     }
 }
 
@@ -138,11 +142,11 @@ const getProfile = async (req, res) => {
         try {
             const user = await User.findById(decoded.id).select('-password');
             if (!user) {
-                return res.status(404).json({ error: 'User does not exist' });
+                return res.status(404).json({ error : 'User does not exist' });
             }
             res.json(user);
         } catch (error) {
-            res.status(500).json({ error: 'Internal server error' });
+            res.status(500).json({ error : 'Internal server error' });
         }
     });
 };
@@ -150,7 +154,7 @@ const getProfile = async (req, res) => {
 
 const logoutUser = (req, res) => {
     res.clearCookie('token'); 
-    res.json({ message: 'Logout successfully!' });
+    res.json({ error : 'Logout successfully!' });
 };
 
 // forgot password
@@ -161,7 +165,7 @@ const forgotPassword = async (req, res) => {
         // Tìm user trong DB
         const user = await User.findOne({ email });
         if (!user) {
-            return res.status(200).json({ message: "If your email exists in our system, an OTP has been sent", status: "success" });
+            return res.json({ message: "Email not found."});
         }
 
         // Tạo OTP ngẫu nhiên và hash
@@ -171,7 +175,7 @@ const forgotPassword = async (req, res) => {
         // Lưu OTP hash + thời gian hết hạn
         user.resetOtp = hashedOtp;
         user.otpExpiry = Date.now() + 15 * 60 * 1000;
-        user.failedAttempts = 0; // Reset lại số lần nhập sai OTP
+        user.failedAttempts = 0; 
         await user.save();
 
         // Cấu hình SMTP: user send email -> SMTP client -> Gmail SMTP server via Internet -> send to users via POP/IMP protocol
@@ -213,17 +217,31 @@ const resetPassword = async (req, res) => {
         // Tìm user trong DB
         const user = await User.findOne({ email });
         if (!user) {
-            return res.status(200).json({ message: "If your email exists in our system, an OTP has been sent.", status: "status" });
+            return res.json({ message: "Email not  found." });
+        }
+        // check password presence and strength
+        const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,64}$/;
+        
+        //check is password is good
+        if(!passwordRegex.test(newPassword)){
+            return res.json({
+                message: 'Password must be at least 6 characters long and include at least one uppercase letter, one lowercase letter, one number.'
+            });
+        }
+
+        // Kiểm tra mật khẩu nhập lại có trùng không
+        if (newPassword !== confirmNewPassword) {
+            return res.json({ message: "Passwords do not match"});
         }
 
         // Kiểm tra số lần nhập OTP sai
         if (user.failedAttempts >= 5) {
-            return res.status(403).json({ message: "Too many failed attempts, try again later", status: "error" });
+            return res.json({ message: "Too many failed attempts, try again later" });
         }
 
         // Kiểm tra OTP hết hạn
         if (!user.otpExpiry || Date.now() > user.otpExpiry) {
-            return res.status(400).json({ message: "Invalid or expired OTP", status: "error" });
+            return res.json({ message: "Invalid or expired OTP" });
         }
 
         // Kiểm tra OTP có đúng không
@@ -231,21 +249,7 @@ const resetPassword = async (req, res) => {
         if (!isOtpValid) {
             user.failedAttempts += 1; // Tăng số lần nhập sai
             await user.save();
-            return res.status(400).json({ message: "Invalid or expired OTP", status: "error" });
-        }
-        // check password presence and strength
-        const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[\W_]).{8,64}$/;
-        
-        //check is password is good
-        if(!passwordRegex.test(newPassword)){
-            return res.status(400).json({
-                message: 'Password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one number, and one special character.'
-            });
-        }
-
-        // Kiểm tra mật khẩu nhập lại có trùng không
-        if (newPassword !== confirmNewPassword) {
-            return res.status(400).json({ message: "Passwords do not match", status: "error" });
+            return res.json({ message: "Invalid or expired OTP" });
         }
 
         // Hash mật khẩu mới
@@ -258,12 +262,23 @@ const resetPassword = async (req, res) => {
         user.failedAttempts = 0; // Reset bộ đếm nhập sai
         await user.save();
 
-        return res.status(200).json({ message: "Password reset successfully", status: "success" });
+        return res.status(200).json({ message : "Password reset successfully!"});
 
     } catch (error) {
-        res.status(500).json({ message: "Internal Server Error" });
+        res.status(500).json({ message : "Internal Server Error" });
     }
 }; 
+
+const getAllUsers = async (req, res) =>{
+    try{
+        const users = await User.find();
+        console.log("All users: ", users);
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.json({data: users, status: "success"});
+    }catch(error){
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+}
 
 module.exports = {
     test,
@@ -273,5 +288,6 @@ module.exports = {
     logoutUser,
     updateUser,
     forgotPassword,
-    resetPassword
+    resetPassword,
+    getAllUsers
 }

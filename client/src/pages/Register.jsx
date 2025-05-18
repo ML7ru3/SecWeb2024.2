@@ -27,20 +27,16 @@ export default function Register() {
         const { name, email, password } = data;
         try {
             const { data } = await axios.post('/register', { name, email, password });
-            if (res.data.error || res.data.message) {
-                const errorMsg = res.data.error || res.data.message;
-                toast.error(errorMsg);
+            if (data.error) {
+                toast.error(data.error);
             } else {
                 setData({ name: '', email: '', password: '' });
                 toast.success('Registration successful!');
                 navigate('/login');
             }
         } catch (error) {
-            console.error(error);
-            const errorMsg =
-                error.response?.data?.error ||
-                error.response?.data?.message;
-            toast.error(errorMsg);
+            toast.error('An error occurred. Please try again!');
+            console.log(error);
         }
     };
 

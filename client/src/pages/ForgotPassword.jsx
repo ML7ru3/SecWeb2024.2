@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import '../styles/ForgotPassword.css';
 import { toast } from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
+
 
 const ForgotPassword = () => {
   const [step, setStep] = useState(1);
@@ -11,30 +13,57 @@ const ForgotPassword = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [infoMessage, setInfoMessage] = useState('');
+  const [timer, setTimer] = useState(0); // in seconds
+  const navigate = useNavigate();
+
+  // Countdown effect
+  useEffect(() => {
+    let countdown;
+    if (step === 2 && timer > 0) {
+      countdown = setInterval(() => {
+        setTimer(prev => prev - 1);
+      }, 1000);
+    }
+
+    if (timer === 0 && step === 2) {
+      toast.error("OTP expired. Please request a new one.");
+    }
+
+    return () => clearInterval(countdown);
+  }, [step, timer]);
+
+  const formatTime = (secs) => {
+  return `${secs} second${secs !== 1 ? 's' : ''}`;
+  };
+
 
   const handleSendOTP = async (e) => {
     e.preventDefault();
     setLoading(true);
     setInfoMessage('');
-  
-    try{
-      const response = await axios.post('/forgot-password', {email});
+
+    try {
+      const response = await axios.post('/forgot-password', { email });
       setInfoMessage(response.data.message);
       setTimeout(() => {
         setStep(2);
+        setTimer(15 * 60); // 15 minutes = 900 seconds
         setInfoMessage('');
-      }
-      , 1500);
-    }catch (error) {
-      setInfoMessage(error.response?.data?.message ||'Failed to send OTP. Please try again.');
-    }finally{
+      }, 1500);
+    } catch (error) {
+      setInfoMessage(error.response?.data?.message || 'Failed to send OTP. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
-  
 
   const handleResetPassword = async (e) => {
     e.preventDefault();
+
+    if (timer <= 0) {
+      toast.error("OTP has expired. Please request a new one.");
+      return;
+    }
 
     if (newPassword !== confirmPassword) {
       alert("Passwords do not match!");
@@ -50,56 +79,49 @@ const ForgotPassword = () => {
       });
 
       alert(response.data.message);
-      setStep(1); 
-      setEmail('');
-      setOtp('');
-      setNewPassword('');
-      setConfirmPassword('');
+
+      // Navigate to login page after 1 second
+      setTimeout(() => {
+        navigate('/login');
+      }, 1000);
     } catch (error) {
-      toast.error( error.response?.data?.message || "Error resetting password");
+      toast.error(error.response?.data?.message || "Error resetting password");
     }
   };
-
 
   return (
     <div className="forgot-container">
       {step === 1 && (
         <form className={`forgot-card fade-in`} onSubmit={handleSendOTP}>
-            <h2>Send OTP</h2>
-            <input
+          <h2>Send OTP</h2>
+          <input
             className="forgot-input"
             type="email"
             placeholder="Your email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            />
-            <button className="forgot-button" type="submit" disabled={loading}>
+          />
+          <button className="forgot-button" type="submit" disabled={loading}>
             {loading ? (
-                <>
+              <>
                 <span className="loader"></span> Sending email...
-                </>
+              </>
             ) : (
-                "Submit"
+              "Submit"
             )}
-            </button>
+          </button>
 
-            {infoMessage && <p className="info-text">{infoMessage}</p>}
+          {infoMessage && <p className="info-text">{infoMessage}</p>}
         </form>
-        )}
+      )}
 
       {step === 2 && (
         <form className="forgot-card fade-in" onSubmit={handleResetPassword}>
           <h2>Reset Password</h2>
 
           <label>Email</label>
-          <input
-            type="email"
-            required
-            value={email}
-            className="input-reset"
-            readOnly
-          />
+          <input type="email" required value={email} className="input-reset" readOnly />
 
           <label>New Password</label>
           <input
@@ -128,7 +150,18 @@ const ForgotPassword = () => {
             className="input-reset"
           />
 
-          <button type="submit" className="reset-button">Reset Password</button>
+          <p className="countdown-text">
+            OTP expires in: <strong>{formatTime(timer)}</strong>
+          </p>
+
+
+          <button
+            type="submit"
+            className="reset-button"
+            disabled={timer <= 0}
+          >
+            Reset Password
+          </button>
         </form>
       )}
     </div>
