@@ -9,12 +9,16 @@ export default function Login() {
     const navigate = useNavigate();
     const { user, setUser } = useContext(UserContext);
 
+    const [isRateLimited, setIsRateLimited] = useState(false);
+    const [retryAfter, setRetryAfter] = useState(0);
+    const [showLockModal, setShowLockModal] = useState(false);
+
     const [data, setData] = useState({
         email: '',
         password: '',
     });
 
-    // check out login if user is logged in
+    // Redirect if already logged in
     useEffect(() => {
         if (user) {
             if (user.role === 'admin') {
@@ -25,21 +29,45 @@ export default function Login() {
         }
     }, [user, navigate]);
 
+    // Countdown for rate limit retry
+    useEffect(() => {
+        if (retryAfter > 0) {
+            setIsRateLimited(true);
+            setShowLockModal(true);
+            const timer = setInterval(() => {
+                setRetryAfter((prev) => {
+                    if (prev <= 1) {
+                        clearInterval(timer);
+                        setIsRateLimited(false);
+                        setShowLockModal(false);
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+            return () => clearInterval(timer);
+        }
+    }, [retryAfter]);
+
     const LoginUser = async (e) => {
         e.preventDefault();
         const { email, password } = data;
         try {
-            const res = await axios.post('/login', { email, password });
+            const response = await axios.post('/login', { email, password });
+            const resData = response.data;
 
-            if (res.data.error) {
-                toast.error(res.data.error);
+            if (resData.error) {
+                toast.error(resData.error);
+            } else if (resData.message && resData.retryAfter) {
+                setRetryAfter(resData.retryAfter);
+                toast.error(resData.message);
             } else {
                 const profileRes = await axios.get('/profile');
                 setUser(profileRes.data);
                 toast.success("Login successful!");
                 setData({ email: '', password: '' });
 
-                // navigate based on role
+                // Redirect based on role
                 if (profileRes.data.role === 'admin') {
                     navigate('/admin/dashboard');
                 } else {
@@ -47,8 +75,7 @@ export default function Login() {
                 }
             }
         } catch (error) {
-            console.error(error);
-            toast.error("Login failed. Please try again!");
+            toast.error('An error occurred. Please try again!');
         }
     };
 
@@ -65,6 +92,7 @@ export default function Login() {
                     value={data.email}
                     onChange={(e) => setData({ ...data, email: e.target.value })}
                     required
+                    disabled={isRateLimited}
                 />
 
                 <label htmlFor="password">Password</label>
@@ -75,14 +103,32 @@ export default function Login() {
                     value={data.password}
                     onChange={(e) => setData({ ...data, password: e.target.value })}
                     required
+                    disabled={isRateLimited}
                 />
 
                 <div>
                     <Link to="/forgot-password" className="forgot-password-link">Forgot Password?</Link>
                 </div>
 
-                <button type="submit">Login</button>
+                <button type="submit" disabled={isRateLimited}>
+                    {isRateLimited ? `Retry in ${retryAfter} seconds` : 'Login'}
+                </button>
             </form>
+
+            {showLockModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h3>Account Locked</h3>
+                        <p>
+                            Too many failed login attempts. Your account is temporarily locked for <strong>{retryAfter}</strong> seconds.
+                        </p>
+                        <p>Please wait or reset your password below.</p>
+                        <div className="modal-actions">
+                            <Link to="/forgot-password" className="reset-link">Reset Password</Link>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

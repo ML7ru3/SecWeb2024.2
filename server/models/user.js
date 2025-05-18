@@ -20,6 +20,10 @@ const userSchema = new Schema({
         default: 0
     },
     password: String,
+    resetOtp: {type: String},
+    otpExpiry: {type: Date},
+    failedAttempts: { type: Number, default: 0 },
+    lockoutUntil: Date,
     role: {
         type: String,
         enum: ['user', 'admin'],

@@ -14,11 +14,11 @@ mongoose.connect(process.env.MONGO_URL)
 //middleware
 app.use(express.json());
 app.use(cookieParser());
+app.disable('x-powered-by');
 app.use(express.urlencoded({extended: false}))
 
 app.use('/', require('./routes/authRoutes'));
 
-const port = 8000;
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+app.listen(process.env.PORT, () => {
+  console.log(`Server is running on port ${process.env.PORT}`);
 });
