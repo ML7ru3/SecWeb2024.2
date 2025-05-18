@@ -63,35 +63,26 @@ export default function GameBoard() {
   };
   
   useEffect(() => {
-    //load the last game session
-    setBestUserScore(Math.max(bestUserScore, userScore));
-
-    //for the user
-    const loadLastGameSession = () => {
-      if (user && !isLogin.current){
-        if (user.lastGameSaved) {
-            setCellValues(() => user.lastGameSaved);
-            setUserScore(() => user.scoreFromLastGameSaved);
-            setBestUserScore(() => user.highscore);
-        }
-        isLogin.current = true;
-        setInitialized(true);
-      } 
+    if (user && !isLogin.current) {
+      if (user.lastGameSaved) {
+        setCellValues(user.lastGameSaved);
+        setUserScore(user.scoreFromLastGameSaved);
+        setBestUserScore(user.highscore);
+      }
+      isLogin.current = true;
+      setInitialized(true);
+    } else if (!user) {
+      // For anonymous users, load from localStorage if available
+      const saved = localStorage.getItem('guestGameState');
+      if (saved) {
+        const { gameState, tempScore, tempHighscore } = JSON.parse(saved);
+        setCellValues(gameState);
+        setUserScore(tempScore);
+        setBestUserScore(tempHighscore);
+      }
     }
-
-    //for the anonymous
-    const continuouslySaveGame = () => {
-      if (user) return;
-      localStorage.setItem('guestGameState', JSON.stringify({
-        gameState: cellValues,
-        tempScore: userScore,
-        tempHighscore: bestUserScore,
-      }));
-    }
-    loadLastGameSession();
-    continuouslySaveGame();
-
-  }, [userScore, user, bestUserScore, cellValues]);
+    if (isLogin.current) setCellValues(user.lastGameSaved);
+  }, [user])
 
   function resetGame() {
     setInitialized(false);

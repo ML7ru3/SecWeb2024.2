@@ -13,7 +13,7 @@ export function UserContextProvider({ children }) {
     const protectedRoutes = ['/admin/dashboard'];
     const shouldCheckProfile = protectedRoutes.some(route => location.pathname.startsWith(route));
 
-    if (!user && shouldCheckProfile) {
+    if (!user || shouldCheckProfile) {
       axios
         .get('/profile')
         .then(({ data }) => {

@@ -49,8 +49,8 @@ const registerUser = async (req, res) => {
         const hashedPassword = await hashPassword(password);
 
         const user = await User.create({
-            name, 
-            email, 
+            name: name, 
+            email: email, 
             password: hashedPassword,
         })
 
@@ -154,7 +154,7 @@ const loginUser = async (req, res) => {
         
         res.cookie('token', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
             maxAge: 3600000,
         });
 
