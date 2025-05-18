@@ -6,6 +6,9 @@ const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_DURATION = 5 * 60 * 1000;
+
 const test = (req, res) => {
     res.json({
         error: 'Hello from the server!'
@@ -162,35 +165,43 @@ const forgotPassword = async (req, res) => {
     try {
         const { email } = req.body;
 
-        // Tìm user trong DB
+        // Find user in DB
         const user = await User.findOne({ email });
         if (!user) {
-            return res.json({ message: "Email not found."});
+            return res.status(404).json({ message: "Email not found." });
         }
 
-        // Tạo OTP ngẫu nhiên và hash
+        // Check if user is locked out
+        if (user.lockoutUntil && user.lockoutUntil > Date.now()) {
+            const remainingTime = Math.ceil((user.lockoutUntil - Date.now()) / 1000 / 60);
+            return res.status(429).json({ 
+                message: `Too many attempts. Please try again in ${remainingTime} minutes.` 
+            });
+        }
+
+        // Generate OTP and hash
         const otp = crypto.randomInt(100000, 999999).toString();
         const hashedOtp = await bcrypt.hash(otp, 10);
 
-        // Lưu OTP hash + thời gian hết hạn
+        // Save OTP and reset attempts
         user.resetOtp = hashedOtp;
         user.otpExpiry = Date.now() + 15 * 60 * 1000;
-        user.failedAttempts = 0; 
+        user.failedAttempts = 0;
+        user.lockoutUntil = undefined;
         await user.save();
 
-        // Cấu hình SMTP: user send email -> SMTP client -> Gmail SMTP server via Internet -> send to users via POP/IMP protocol
+        // SMTP configuration
         const transporter = nodemailer.createTransport({
-            service: "gmail", // email will be sent using Gmail SMTP server
+            service: "gmail",
             auth: {
-                user: process.env.EMAIL_USER, // the email address of the our app
-                pass: process.env.EMAIL_PASS, // developer setup an email password for the app
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS,
             }
         });
 
-        // Kiểm tra SMTP trước khi gửi email
         await transporter.verify();
 
-        // Gửi email
+        // Send email
         await transporter.sendMail({
             from: process.env.EMAIL_USER,
             to: email,
@@ -204,81 +215,77 @@ const forgotPassword = async (req, res) => {
         });
 
     } catch (error) {
-        res.status(500).json({ message: "Internal Server Error" });
+        console.error('Forgot password error:', error);
+        return res.status(500).json({ message: "Internal Server Error" });
     }
 };
 
-
-// reset password
 const resetPassword = async (req, res) => {
     const { email, otp, newPassword, confirmNewPassword } = req.body;
 
     try {
-        // Tìm user trong DB
+        // Find user
         const user = await User.findOne({ email });
         if (!user) {
-            return res.json({ message: "Email not  found." });
+            return res.status(404).json({ message: "Email not found." });
         }
-        // check password presence and strength
-        const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,64}$/;
-        
-        //check is password is good
-        if(!passwordRegex.test(newPassword)){
-            return res.json({
-                message: 'Password must be at least 6 characters long and include at least one uppercase letter, one lowercase letter, one number.'
+
+        // Check lockout
+        if (user.lockoutUntil && user.lockoutUntil > Date.now()) {
+            const remainingTime = Math.ceil((user.lockoutUntil - Date.now()) / 1000 / 60);
+            return res.status(429).json({ 
+                message: `Too many attempts. Please try again in ${remainingTime} minutes.` 
             });
         }
 
-        // Kiểm tra mật khẩu nhập lại có trùng không
+        // Validate password
+        const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,64}$/;
+        if (!passwordRegex.test(newPassword)) {
+            return res.status(400).json({
+                message: 'Password must be 6-64 characters and include at least one uppercase letter, one lowercase letter, and one number.'
+            });
+        }
+
         if (newPassword !== confirmNewPassword) {
-            return res.json({ message: "Passwords do not match"});
+            return res.status(400).json({ message: "Passwords do not match" });
         }
 
-        // Kiểm tra số lần nhập OTP sai
-        if (user.failedAttempts >= 5) {
-            return res.json({ message: "Too many failed attempts, try again later" });
-        }
-
-        // Kiểm tra OTP hết hạn
+        // Check OTP expiry
         if (!user.otpExpiry || Date.now() > user.otpExpiry) {
-            return res.json({ message: "Invalid or expired OTP" });
+            return res.status(400).json({ message: "OTP expired. Please request a new one." });
         }
 
-        // Kiểm tra OTP có đúng không
+        // Verify OTP
         const isOtpValid = await bcrypt.compare(otp, user.resetOtp);
         if (!isOtpValid) {
-            user.failedAttempts += 1; // Tăng số lần nhập sai
+            user.failedAttempts = (user.failedAttempts || 0) + 1;
+            
+            // Set lockout if max attempts reached
+            if (user.failedAttempts >= MAX_ATTEMPTS) {
+                user.lockoutUntil = Date.now() + LOCKOUT_DURATION;
+            }
+            
             await user.save();
-            return res.json({ message: "Invalid or expired OTP" });
+            return res.status(400).json({ 
+                message: `Invalid OTP. ${MAX_ATTEMPTS - user.failedAttempts} attempts remaining.` 
+            });
         }
 
-        // Hash mật khẩu mới
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-        // Lưu mật khẩu mới và xóa OTP
-        user.password = hashedPassword;
+        // Update password and clear reset data
+        user.password = await bcrypt.hash(newPassword, 10);
         user.resetOtp = undefined;
         user.otpExpiry = undefined;
-        user.failedAttempts = 0; // Reset bộ đếm nhập sai
+        user.failedAttempts = 0;
+        user.lockoutUntil = undefined;
         await user.save();
 
-        return res.status(200).json({ message : "Password reset successfully!"});
+        return res.status(200).json({ message: "Password reset successfully!" });
 
     } catch (error) {
-        res.status(500).json({ message : "Internal Server Error" });
+        console.error('Reset password error:', error);
+        return res.status(500).json({ message: "Internal Server Error" });
     }
-}; 
-
-const getAllUsers = async (req, res) =>{
-    try{
-        const users = await User.find();
-        console.log("All users: ", users);
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.json({data: users, status: "success"});
-    }catch(error){
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-}
+};
 
 module.exports = {
     test,
@@ -288,6 +295,5 @@ module.exports = {
     logoutUser,
     updateUser,
     forgotPassword,
-    resetPassword,
-    getAllUsers
+    resetPassword
 }

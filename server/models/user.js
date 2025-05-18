@@ -21,7 +21,9 @@ const userSchema = new Schema({
     },
     password: String,
     resetOtp: {type: String},
-    otpExpiry: {type: Date}
+    otpExpiry: {type: Date},
+    failedAttempts: { type: Number, default: 0 },
+    lockoutUntil: Date
 }); 
 
 const UserModel = mongoose.model('User', userSchema);
