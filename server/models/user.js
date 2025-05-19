@@ -28,7 +28,9 @@ const userSchema = new Schema({
         type: String,
         enum: ['user', 'admin'],
         default: 'user'
-    }
+    },
+
+    tempTotpSecret: {type: String},
 }); 
 
 module.exports = mongoose.model('User', userSchema);

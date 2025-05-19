@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/user');
 const rateLimit = require('express-rate-limit');
 
+
 const hashPassword = (password) => {
     return new Promise((resolve, reject) => {
         bcrypt.genSalt(12, (err, salt) => {
@@ -80,11 +81,11 @@ const registerLimiter = rateLimit({
 
 // rate limiting middleware to prevent brute-force attacks
 const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
+    windowMs: 5 * 60 * 1000,
     max: 5, // Limit each IP to 5 login requests per windowMs
     handler: (req, res, next, options) => {
         res.json({
-            message: 'Too many login attempts, please try again after 15 minutes.',
+            message: 'Too many login attempts, please try again after 5 minutes.',
             retryAfter: Math.ceil(options.windowMs / 1000), // Seconds until reset
             remaining: 0, // No attempts left
         });

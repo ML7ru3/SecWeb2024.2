@@ -7,6 +7,8 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
+const speakeasy = require('speakeasy');
+
 
 const test = (req, res) => {
     res.json({
@@ -129,9 +131,10 @@ const updateUser = async (req, res) => {
         return res.json(updatedUser); // Return the updated user
     } catch (err) {
         console.error('Error in updateUser:', err);
-        return res.status(500).json({ error: 'Server error' });
+        return res.status(500).json({ error: 'Internal Server Error' });
     }
 };
+
 
 const loginUser = async (req, res) => {
     try {
@@ -144,47 +147,114 @@ const loginUser = async (req, res) => {
         });
 
         if (!turnstileResponse.data.success) {
-            return res.json({
-                error: 'Turnstile verification failed'
-            });
+            return res.json({ error: 'Turnstile verification failed' });
         }
 
-        // Proceed with user login
+        // Validate user credentials
         const user = await User.findOne({ email });
         if (!user) {
-            return res.json({
-                error: 'Invalid email or password'
-            });
+            return res.json({ error: 'Invalid email or password' });
         }
-        const match = await comparePassword(password, user.password)
 
+        const match = await comparePassword(password, user.password);
         if (!match) {
-            res.json({error: 'Invalid email or password'});
-            return;
+            return res.json({ error: 'Invalid email or password' });
         }
 
+        // Generate temporary TOTP secret
+        const tempSecret = speakeasy.generateSecret({ length: 20 }).base32;
+        user.tempTotpSecret = tempSecret;
+        await user.save();
+
+        const totp = speakeasy.totp({ secret: tempSecret, encoding: 'base32', step: 300 });
+
+        // Send TOTP to email
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS,
+            }
+        });
+
+        await transporter.verify();
+
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: 'Your Login Verification Code',
+            text: `Your verification code is: ${totp}. It expires in 5 minutes.`,
+        });
+
+        const tempToken = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '5m' });
+
+        return res.status(200).json({ 
+            message: 'Verification code sent to your email. Please check your email.',
+            tempToken 
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Login failed. Please try again!' });
+    }
+};
+
+// Step 2: Verify TOTP code
+const verifyTotp = async (req, res) => {
+    try {
+        const { tempToken, totpCode } = req.body;
+
+        // Verify temporary JWT token
+        let decoded;
+        try {
+            decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
+        } catch (error) {
+            return res.json({ error: 'Invalid or expired temporary token' });
+        }
+
+        // Find user and validate temp secret
+        const user = await User.findOne({ email: decoded.email });
+        if (!user || !user.tempTotpSecret) {
+            return res.json({ error: 'Invalid session or expired code' });
+        }
+
+        const isValid = speakeasy.totp.verify({
+            secret: user.tempTotpSecret,
+            encoding: 'base32',
+            token: totpCode,
+            window: 1,
+            step: 300
+        });
+
+        if (!isValid) {
+            return res.json({ error: 'Invalid verification code' });
+        }
+
+        // Clear temp secret
+        user.tempTotpSecret = undefined;
+        await user.save();
+
+        // Generate final login JWT
         const token = jwt.sign(
-            {email: user.email, id: user._id, name:user.name}, 
-            process.env.JWT_SECRET, 
-            {expiresIn: '1h'}
-        )
-        
+            { email: user.email, id: user._id, name: user.name },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
+
+        // Set auth cookie
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             maxAge: 3600000,
         });
 
-        res.json({message: 'Login successfully', user});
+        return res.status(200).json({ message: 'Login successful', user });
 
     } catch (error) {
-        console.log(error);
-        res.json({
-            error: 'Login failed. Please try again!'
-        });
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
     }
-
-}
+};
 
 
 const getProfile = async (req, res) => {
@@ -209,7 +279,7 @@ const getProfile = async (req, res) => {
             res.json(user);
         } catch (error) {
             console.error(error);
-            res.status(500).json({ error: 'Server error' });
+            res.status(500).json({ error: 'Internal Server Error' });
         }
     });
 };
@@ -230,8 +300,7 @@ const getAllUsers = async (req, res) => {
         const users = await User.find().select('-password');
         res.json(users);
     } catch (error) {
-        console.error('Error fetching users:', error);
-        res.status(500).json({ error: 'Failed to fetch users' });
+        res.status(500).json({ error: 'Internal Server Error.' });
     }
 };
 
@@ -249,8 +318,7 @@ const deleteUser = async (req, res) => {
         }
         res.json({ message: 'User deleted successfully' });
     } catch (error) {
-        console.error('Error deleting user:', error);
-        res.status(500).json({ error: 'Failed to delete user' });
+        res.status(500).json({ error: 'Internal Server Error.' });
     }
 };
 
@@ -268,8 +336,7 @@ const resetUserScore = async (req, res) => {
         }
         res.json({ message: 'Highscore reset', user: updatedUser });
     } catch (error) {
-        console.error('Error resetting highscore:', err);
-        return res.status(500).json({ error: 'Failed to reset highscore' });
+        return res.status(500).json({ error: 'Internal Server Error' });
     }
 };
 
@@ -299,8 +366,7 @@ const addUserByAdmin = async (req, res) => {
         const newUser = await User.create({ name, email, password: hashedPassword, highscore: 0 });
         res.json({ message: 'User created successfully', user: newUser });
     } catch (error) {
-        console.error('Error adding user:', error);
-        return res.status(500).json({ error: 'Failed to add user' });
+        return res.status(500).json({ error: 'Internal Server Error' });
     }
 };
 // forgot password
@@ -328,7 +394,7 @@ const forgotPassword = async (req, res) => {
 
         // Save OTP and reset attempts
         user.resetOtp = hashedOtp;
-        user.otpExpiry = Date.now() + 15 * 60 * 1000;
+        user.otpExpiry = Date.now() + 5 * 60 * 1000;
         user.failedAttempts = 0;
         user.lockoutUntil = undefined;
         await user.save();
@@ -349,7 +415,7 @@ const forgotPassword = async (req, res) => {
             from: process.env.EMAIL_USER,
             to: email,
             subject: "Password Reset OTP",
-            text: `Your OTP for password reset is: ${otp}. This OTP is valid for 15 minutes.`,
+            text: `Your OTP for password reset is: ${otp}. This OTP is valid for 5 minutes.`,
         });
 
         return res.status(200).json({
@@ -441,5 +507,6 @@ module.exports = {
     resetUserScore,
     addUserByAdmin,
     forgotPassword,
-    resetPassword
+    resetPassword,
+    verifyTotp
 };
