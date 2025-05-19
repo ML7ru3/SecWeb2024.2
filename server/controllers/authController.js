@@ -16,7 +16,7 @@ const test = (req, res) => {
 
 const registerUser = async (req, res) => {
     try {   
-        const { name, email, password, turnstileToken } = req.body;
+        const { name, email, password, turnstileToken, lastSession } = req.body;
 
         // Verify Turnstile token
         const turnstileResponse = await axios.post('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
@@ -64,9 +64,12 @@ const registerUser = async (req, res) => {
         const hashedPassword = await hashPassword(password);
 
         const user = await User.create({
-            name, 
-            email, 
+            name: name, 
+            email: email, 
             password: hashedPassword,
+            lastGameSaved: lastSession.gameState,
+            score: lastSession.tempScore,
+            scoreFromLastGameSaved: lastSession.tempHighscore
         })
 
         return res.json({
@@ -171,7 +174,7 @@ const loginUser = async (req, res) => {
         
         res.cookie('token', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
             maxAge: 3600000,
         });
 

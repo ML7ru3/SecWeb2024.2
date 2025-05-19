@@ -63,23 +63,19 @@ export default function GameBoard() {
   };
   
   useEffect(() => {
-    //load the last game session
     setBestUserScore(Math.max(bestUserScore, userScore));
-
-    //for the user
-    const loadLastGameSession = () => {
-      if (user && !isLogin.current){
-        if (user.lastGameSaved) {
-            setCellValues(() => user.lastGameSaved);
-            setUserScore(() => user.scoreFromLastGameSaved);
-            setBestUserScore(() => user.highscore);
-        }
-        isLogin.current = true;
-        setInitialized(true);
-      } 
-    }
-
-    //for the anonymous
+    if (user && !isLogin.current) {
+      if (user.lastGameSaved) {
+        setCellValues(user.lastGameSaved);
+        setUserScore(user.scoreFromLastGameSaved);
+        setBestUserScore(user.highscore);
+      }
+      isLogin.current = true;
+      setInitialized(true);
+    }   
+    if (isLogin.current) setCellValues(user.lastGameSaved);
+    // For the non-user, save the game session locally and when there's 
+    // exist a new user registered, pass them into new user.
     const continuouslySaveGame = () => {
       if (user) return;
       localStorage.setItem('guestGameState', JSON.stringify({
@@ -88,10 +84,8 @@ export default function GameBoard() {
         tempHighscore: bestUserScore,
       }));
     }
-    loadLastGameSession();
-    continuouslySaveGame();
-
-  }, [userScore, user, bestUserScore, cellValues]);
+    if (!user) continuouslySaveGame();
+  }, [user, userScore, cellValues, bestUserScore])
 
   function resetGame() {
     setInitialized(false);
