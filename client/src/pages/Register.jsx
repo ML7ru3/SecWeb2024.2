@@ -31,9 +31,9 @@ export default function Register() {
             toast.error("Please complete the Turnstile challenge");
             return;
         }
-
+        const lastSession = JSON.parse(localStorage.getItem('guestGameState'));
         try {
-            const { data } = await axios.post('/register', { name, email, password, turnstileToken });
+            const { data } = await axios.post('/register', { name, email, password, turnstileToken, lastSession});
             if (data.error) {
                 toast.error(data.error);
             } else {

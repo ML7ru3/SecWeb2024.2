@@ -1,4 +1,4 @@
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
 const rateLimit = require('express-rate-limit');
@@ -78,11 +78,21 @@ const registerLimiter = rateLimit({
     message: 'Too many registration attempts, please try again after 5 minutes'
 });
 
+// rate limiting middleware to prevent brute-force attacks
 const loginLimiter = rateLimit({
-    windowMs: 5 * 60 * 1000, // 5 phút
-    max: 10, // 10 yêu cầu
-    message: 'Too many login attempts, please try again after 5 minutes'
+    windowMs: 15 * 60 * 1000,
+    max: 5, // Limit each IP to 5 login requests per windowMs
+    handler: (req, res, next, options) => {
+        res.json({
+            message: 'Too many login attempts, please try again after 15 minutes.',
+            retryAfter: Math.ceil(options.windowMs / 1000), // Seconds until reset
+            remaining: 0, // No attempts left
+        });
+    },
+    standardHeaders: true, 
+    legacyHeaders: false,
 });
+
 
 const adminUsersLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 phút

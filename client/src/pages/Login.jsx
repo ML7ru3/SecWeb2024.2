@@ -9,6 +9,10 @@ export default function Login() {
     const navigate = useNavigate();
     const { user, setUser } = useContext(UserContext);
 
+    const [isRateLimited, setIsRateLimited] = useState(false);
+    const [retryAfter, setRetryAfter] = useState(0);
+    const [showLockModal, setShowLockModal] = useState(false);
+
     const [data, setData] = useState({
         email: '',
         password: '',
@@ -25,6 +29,26 @@ export default function Login() {
         }
     }, [user, navigate]);
 
+    // Countdown for rate limit retry
+    useEffect(() => {
+        if (retryAfter > 0) {
+            setIsRateLimited(true);
+            setShowLockModal(true);
+            const timer = setInterval(() => {
+                setRetryAfter((prev) => {
+                    if (prev <= 1) {
+                        clearInterval(timer);
+                        setIsRateLimited(false);
+                        setShowLockModal(false);
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+            return () => clearInterval(timer);
+        }
+    }, [retryAfter]);
+
     const LoginUser = async (e) => {
         e.preventDefault();
         const { email, password } = data;
@@ -36,17 +60,21 @@ export default function Login() {
         }
 
         try {
-            const res = await axios.post('/login', { email, password, turnstileToken });
+            const response = await axios.post('/login', { email, password, turnstileToken });
+            const resData = response.data;
 
-            if (res.data.error) {
-                toast.error(res.data.error);
+            if (resData.error) {
+                toast.error(resData.error);
+            } else if (resData.message && resData.retryAfter) {
+                setRetryAfter(resData.retryAfter);
+                toast.error(resData.message);
             } else {
                 const profileRes = await axios.get('/profile');
                 setUser(profileRes.data);
                 toast.success("Login successful!");
                 setData({ email: '', password: '' });
 
-                // Navigate based on role
+                // Redirect based on role
                 if (profileRes.data.role === 'admin') {
                     navigate('/admin/dashboard');
                 } else {
@@ -54,8 +82,7 @@ export default function Login() {
                 }
             }
         } catch (error) {
-            console.error(error);
-            toast.error("Login failed. Please try again!");
+            toast.error('An error occurred. Please try again!');
         }
     };
 
@@ -99,6 +126,21 @@ export default function Login() {
 
                 <button type="submit">Login</button>
             </form>
+
+            {showLockModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h3>Account Locked</h3>
+                        <p>
+                            Too many failed login attempts. Your account is temporarily locked for <strong>{retryAfter}</strong> seconds.
+                        </p>
+                        <p>Please wait or reset your password below.</p>
+                        <div className="modal-actions">
+                            <Link to="/forgot-password" className="reset-link">Reset Password</Link>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
