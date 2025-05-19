@@ -101,7 +101,7 @@ const sslOptions = {
 };
 
 // HTTPS Server
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT;
 const server = https.createServer(sslOptions, app);
 
 // Server timeout
