@@ -217,7 +217,7 @@ export default function Login() {
                         required
                     />
                     <p className="countdown-text">
-                        OTP expires in: <strong>{formatTime(timer)}</strong>
+                        Verification code expires in: <strong>{formatTime(timer)}</strong>
                     </p>
 
                     <div className="form-actions">
