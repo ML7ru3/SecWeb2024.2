@@ -19,8 +19,9 @@ mongoose.connect(process.env.MONGO_URL, {
 .then(() => console.log("Database Connected"))
 .catch((err) => console.log("Database connection error", err));
 
-// Middleware Security
-app.use(helmet()); // Bảo mật headers
+// Secure server configurations
+app.use(helmet());
+app.disable('x-powered-by');
 app.use(express.json({ limit: '10kb' })); // Giới hạn kích thước request
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: false, limit: '10kb' }));
@@ -127,6 +128,14 @@ if (PORT === 443 || PORT === 80) {
   });
   http.createServer(redirectApp).listen(PORT === 443 ? 80 : 3000);
 }
+// Error handling middleware
+app.use((req, res, next) => {
+  res.status(404).json({ message: 'Resource not found' });
+});
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: 'Internal Server Error' });
+});
 
 // Process handlers
 process.on('unhandledRejection', (err) => {

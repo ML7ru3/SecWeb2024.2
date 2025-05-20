@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { test, registerUser, loginUser, getProfile, logoutUser, updateUser, getAllUsers, deleteUser, resetUserScore, addUserByAdmin, forgotPassword, resetPassword} = require('../controllers/authController');
+const { test, registerUser, loginUser, getProfile, logoutUser, updateUser, getAllUsers, deleteUser, resetUserScore, addUserByAdmin, forgotPassword, resetPassword, verifyTotp, generateMfaSecret, verifyMfaSetup, disableMfa, loginMfaVerify} = require('../controllers/authController');
 const { requireAuth, requireAdmin, registerLimiter, loginLimiter, adminUsersLimiter, updateLimiter } = require('../helpers/auth');
 
 
@@ -8,6 +8,8 @@ const { requireAuth, requireAdmin, registerLimiter, loginLimiter, adminUsersLimi
 router.get('/', test);
 router.post('/register', registerLimiter, registerUser);
 router.post('/login',  loginLimiter, loginUser);
+router.post('/login-mfa', loginLimiter, verifyTotp);
+
 router.get('/profile', requireAuth, getProfile);
 router.post('/logout', requireAuth, logoutUser);
 router.put('/update',  requireAuth, updateLimiter, updateUser);

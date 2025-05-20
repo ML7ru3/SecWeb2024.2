@@ -50,7 +50,7 @@ const ForgotPassword = () => {
       const response = await axios.post('/forgot-password', { email });
       toast.success(response.data.message);
       setStep(2);
-      setTimer(15 * 60);
+      setTimer(5 * 60);
       setCanResend(false);
       // clear old inputs
       setOtp('');
