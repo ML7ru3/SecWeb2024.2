@@ -2,121 +2,262 @@ const User = require('../models/user');
 const { hashPassword, comparePassword } = require('../helpers/auth');
 const jwt = require('jsonwebtoken');
 const sanitizeHtml = require('sanitize-html')
+const axios = require('axios');
+const crypto = require('crypto');
+const bcrypt = require('bcrypt');
+const nodemailer = require('nodemailer');
+require('dotenv').config();
+const speakeasy = require('speakeasy');
+
 
 const test = (req, res) => {
     res.json({
         message: 'Hello from the server!'
     });
-}
+};
 
 const registerUser = async (req, res) => {
     try {   
-        const { name, email, password, lastSession } = req.body;
+        const { name, email, password, turnstileToken, lastSession } = req.body;
+
+        // Verify Turnstile token
+        const turnstileResponse = await axios.post('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+            secret: process.env.TURNSTILE_SECRET_KEY,
+            response: turnstileToken,
+        });
+
+        if (!turnstileResponse.data.success) {
+            return res.json({
+                error: 'Turnstile verification failed'
+            });
+        }
+
         //check if name was entered
         if(!name) {
             return res.json({
-                error: 'Name is required'
+                error: 'Name is required.'
             })
         }
-        //check is password is good
-        if(!password || password.length < 6) {
-            return res.json({
-                error: 'Password is required and must be at least 6 characters long'
-            })
+
+        if (!email){
+            return res.json({error: 'Email is required.'});
         }
+        if (!password) {
+            return res.json({ error: 'Password is required' });
+        }
+        
         //Check email
         const exist = await User.findOne({ email });
         if(exist) {
             return res.json({
-                error: 'Email is already taken'
+                error: 'Email already existed.'
             })
+        }
+        // check password presence and strength
+        const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,64}$/;
+        
+        //check is password is good
+        if(!passwordRegex.test(password)){
+            return res.json({
+                error: 'Password must be at least 6 characters long and include at least one uppercase letter, one lowercase letter and one number.'
+            });   
         }
 
         const hashedPassword = await hashPassword(password);
 
         const user = await User.create({
-            name, 
-            email, 
+            name: name, 
+            email: email, 
             password: hashedPassword,
             lastGameSaved: lastSession.gameState,
             score: lastSession.tempScore,
             scoreFromLastGameSaved: lastSession.tempHighscore
         })
 
-        return res.json(user)
+        return res.json({
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            highscore: user.highscore || 0
+        });
         
     } catch (err){
-        console.log(err);
+        return res.json({error: 'Internal server error'});
     }
 }
 
 const updateUser = async (req, res) => {
     try {
         const { email, lastGameSaved, scoreFromLastGameSaved, newHighScore } = req.body;
+        const { user } = req; // Lấy từ middleware requireAuth
 
-        // Validate input
+        // 1. Validate input
         if (!email || !lastGameSaved) {
             return res.status(400).json({ error: 'Email and lastGameSaved are required' });
         }
 
-        // Find the user
-        const user = await User.findOne({ email });
-        if (!user) {
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+
+        // Validate scores
+        if (typeof scoreFromLastGameSaved !== 'number' || scoreFromLastGameSaved < 0) {
+            return res.status(400).json({ error: 'scoreFromLastGameSaved must be a non-negative number' });
+        }
+        if (typeof newHighScore !== 'number' || newHighScore < 0) {
+            return res.status(400).json({ error: 'newHighScore must be a non-negative number' });
+        }
+
+        // 2. Check authorization
+        const targetUser = await User.findOne({ email });
+        if (!targetUser) {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        // Update the user's highscore
-        const highscore = Math.max(user.highscore || 0, newHighScore || 0);
+        // Allow update if user is updating their own data or is an admin
+        if (user.email !== email && user.role !== 'admin') {
+            return res.status(403).json({ error: 'Forbidden: You can only update your own data' });
+        }
 
-        // Update the user
+        // 3. Update the user's highscore
+        const highscore = Math.max(targetUser.highscore || 0, newHighScore || 0);
+
+        // 4. Update the user
         const updatedUser = await User.findOneAndUpdate(
             { email }, // Match the user by email
             { $set: { lastGameSaved, scoreFromLastGameSaved, highscore } }, // Update fields
             { new: true } // Return the updated document
-        );
+        ).select('-password'); // Exclude password from response
 
         return res.json(updatedUser); // Return the updated user
     } catch (err) {
         console.error('Error in updateUser:', err);
-        return res.status(500).json({ error: 'Server error' });
+        return res.status(500).json({ error: 'Internal Server Error' });
     }
 };
 
+
 const loginUser = async (req, res) => {
     try {
-        const {email, password} = req.body;
-        const user = await User.findOne({email});
+        const { email, password, turnstileToken } = req.body;
+
+        // Verify Turnstile token
+        const turnstileResponse = await axios.post('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+            secret: process.env.TURNSTILE_SECRET_KEY,
+            response: turnstileToken,
+        });
+
+        if (!turnstileResponse.data.success) {
+            return res.json({ error: 'Turnstile verification failed' });
+        }
+
+        // Validate user credentials
+        const user = await User.findOne({ email });
         if (!user) {
-            return res.json({
-                error: 'No user found'
-            })
+            return res.json({ error: 'Invalid email or password' });
         }
-        const match = await comparePassword(password, user.password)
 
+        const match = await comparePassword(password, user.password);
         if (!match) {
-            res.json({error: 'Invalid password'});
-            return;
+            return res.json({ error: 'Invalid email or password' });
         }
 
+        // Generate temporary TOTP secret
+        const tempSecret = speakeasy.generateSecret({ length: 20 }).base32;
+        user.tempTotpSecret = tempSecret;
+        await user.save();
+
+        const totp = speakeasy.totp({ secret: tempSecret, encoding: 'base32', step: 300 });
+
+        // Send TOTP to email
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS,
+            }
+        });
+
+        await transporter.verify();
+
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: 'Your Login Verification Code',
+            text: `Your verification code is: ${totp}. It expires in 5 minutes.`,
+        });
+
+        const tempToken = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '5m' });
+
+        return res.status(200).json({ 
+            message: 'Verification code sent to your email. Please check your email.',
+            tempToken 
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Login failed. Please try again!' });
+    }
+};
+
+// Step 2: Verify TOTP code
+const verifyTotp = async (req, res) => {
+    try {
+        const { tempToken, totpCode } = req.body;
+
+        // Verify temporary JWT token
+        let decoded;
+        try {
+            decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
+        } catch (error) {
+            return res.json({ error: 'Invalid or expired temporary token' });
+        }
+
+        // Find user and validate temp secret
+        const user = await User.findOne({ email: decoded.email });
+        if (!user || !user.tempTotpSecret) {
+            return res.json({ error: 'Invalid session or expired code' });
+        }
+
+        const isValid = speakeasy.totp.verify({
+            secret: user.tempTotpSecret,
+            encoding: 'base32',
+            token: totpCode,
+            window: 1,
+            step: 300
+        });
+
+        if (!isValid) {
+            return res.json({ error: 'Invalid verification code' });
+        }
+
+        // Clear temp secret
+        user.tempTotpSecret = undefined;
+        await user.save();
+
+        // Generate final login JWT
         const token = jwt.sign(
-            {email: user.email, id: user._id, name:user.name}, 
-            process.env.JWT_SECRET, 
-            {expiresIn: '1h'}
-        )
-        
+            { email: user.email, id: user._id, name: user.name },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
+
+        // Set auth cookie
         res.cookie('token', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
             maxAge: 3600000,
         });
 
-        res.json({message: 'Login successfully', user});
+        return res.status(200).json({ message: 'Login successful', user });
 
     } catch (error) {
-        console.log(error);
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
     }
-
-}
+};
 
 
 const getProfile = async (req, res) => {
@@ -141,84 +282,234 @@ const getProfile = async (req, res) => {
             res.json(user);
         } catch (error) {
             console.error(error);
-            res.status(500).json({ error: 'Server error' });
+            res.status(500).json({ error: 'Internal Server Error' });
         }
     });
 };
 
 
-const logoutUser = (req, res) => {
-    res.clearCookie('token'); 
-    res.json({ message: 'Đăng xuất thành công!' });
+const logoutUser = async (req, res) => {
+    res.clearCookie('token');
+    res.json({ message: 'Logout successful!' });
 };
 
 const getAllUsers = async (req, res) => {
     try {
+        const { user } = req; // Lấy từ middleware requireAuth
+        // requireAdmin đã kiểm tra role, nhưng giữ để rõ ràng
+        if (user.role !== 'admin') {
+            return res.status(403).json({ error: 'Forbidden: Admin access required' });
+        }
         const users = await User.find().select('-password');
         res.json(users);
     } catch (error) {
-        console.error('Error fetching users:', error);
-        res.status(500).json({ error: 'Failed to fetch users' });
+        res.status(500).json({ error: 'Internal Server Error.' });
     }
 };
 
 const deleteUser = async (req, res) => {
     try {
+        const { user } = req; // Lấy từ middleware requireAuth
         const { id } = req.params;
-        await User.findByIdAndDelete(id);
+        // requireAdmin đã kiểm tra role, nhưng giữ để rõ ràng
+        if (user.role !== 'admin') {
+            return res.status(403).json({ error: 'Forbidden: Admin access required' });
+        }
+        const deletedUser = await User.findByIdAndDelete(id);
+        if (!deletedUser) {
+            return res.status(404).json({ error: 'User not found' });
+        }
         res.json({ message: 'User deleted successfully' });
     } catch (error) {
-        console.error('Error deleting user:', error);
-        res.status(500).json({ error: 'Failed to delete user' });
+        res.status(500).json({ error: 'Internal Server Error.' });
     }
 };
 
 const resetUserScore = async (req, res) => {
     try {
+        const { user } = req; // Lấy từ middleware requireAuth
         const { id } = req.params;
-        const user = await User.findByIdAndUpdate(id, { highscore: 0 }, { new: true });
-        if (!user) return res.status(404).json({ error: 'User not found' });
-        res.json({ message: 'Highscore reset', user });
+        // requireAdmin đã kiểm tra role, nhưng giữ để rõ ràng
+        if (user.role !== 'admin') {
+            return res.status(403).json({ error: 'Forbidden: Admin access required' });
+        }
+        const updatedUser = await User.findByIdAndUpdate(id, { highscore: 0 }, { new: true });
+        if (!updatedUser) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        res.json({ message: 'Highscore reset', user: updatedUser });
     } catch (error) {
-        console.error('Error resetting highscore:', error);
-        res.status(500).json({ error: 'Failed to reset highscore' });
+        return res.status(500).json({ error: 'Internal Server Error' });
     }
 };
 
 const addUserByAdmin = async (req, res) => {
     try {
+        const { user } = req; // Lấy từ middleware requireAuth
         const { name, email, password } = req.body;
-
+        // requireAdmin đã kiểm tra role, nhưng giữ để rõ ràng
+        if (user.role !== 'admin') {
+            return res.status(403).json({ error: 'Forbidden: Admin access required' });
+        }
         if (!name || !email || !password) {
             return res.status(400).json({ error: 'All fields are required' });
         }
-
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+        if (password.length < 6) {
+            return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+        }
         const exist = await User.findOne({ email });
         if (exist) {
             return res.status(400).json({ error: 'Email already exists' });
         }
-
         const hashedPassword = await hashPassword(password);
-        const user = await User.create({ name, email, password: hashedPassword, highscore: 0 });
-
-        res.json({ message: 'User created successfully', user });
+        const newUser = await User.create({ name, email, password: hashedPassword, highscore: 0 });
+        res.json({ message: 'User created successfully', user: newUser });
     } catch (error) {
-        console.error('Error adding user:', error);
-        res.status(500).json({ error: 'Failed to add user' });
+        return res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+// forgot password
+const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        // Find user in DB
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ message: "Email not found." });
+        }
+
+        // Check if user is locked out
+        if (user.lockoutUntil && user.lockoutUntil > Date.now()) {
+            const remainingTime = Math.ceil((user.lockoutUntil - Date.now()) / 1000 / 60);
+            return res.status(429).json({ 
+                message: `Too many attempts. Please try again in ${remainingTime} minutes.` 
+            });
+        }
+
+        // Generate OTP and hash
+        const otp = crypto.randomInt(100000, 999999).toString();
+        const hashedOtp = await bcrypt.hash(otp, 10);
+
+        // Save OTP and reset attempts
+        user.resetOtp = hashedOtp;
+        user.otpExpiry = Date.now() + 5 * 60 * 1000;
+        user.failedAttempts = 0;
+        user.lockoutUntil = undefined;
+        await user.save();
+
+        // SMTP configuration
+        const transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS,
+            }
+        });
+
+        await transporter.verify();
+
+        // Send email
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: "Password Reset OTP",
+            text: `Your OTP for password reset is: ${otp}. This OTP is valid for 5 minutes.`,
+        });
+
+        return res.status(200).json({
+            message: "OTP sent to your email",
+            status: "success",
+        });
+
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        return res.status(500).json({ message: "Internal Server Error" });
     }
 };
 
+const resetPassword = async (req, res) => {
+    const { email, otp, newPassword, confirmNewPassword } = req.body;
 
+    try {
+        // Find user
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ message: "Email not found." });
+        }
 
+        // Check lockout
+        if (user.lockoutUntil && user.lockoutUntil > Date.now()) {
+            const remainingTime = Math.ceil((user.lockoutUntil - Date.now()) / 1000 / 60);
+            return res.status(429).json({ 
+                message: `Too many attempts. Please try again in ${remainingTime} minutes.` 
+            });
+        }
+
+        // Validate password
+        const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,64}$/;
+        if (!passwordRegex.test(newPassword)) {
+            return res.status(400).json({
+                message: 'Password must be 6-64 characters and include at least one uppercase letter, one lowercase letter, and one number.'
+            });
+        }
+
+        if (newPassword !== confirmNewPassword) {
+            return res.status(400).json({ message: "Passwords do not match" });
+        }
+
+        // Check OTP expiry
+        if (!user.otpExpiry || Date.now() > user.otpExpiry) {
+            return res.status(400).json({ message: "OTP expired. Please request a new one." });
+        }
+
+        // Verify OTP
+        const isOtpValid = await bcrypt.compare(otp, user.resetOtp);
+        if (!isOtpValid) {
+            user.failedAttempts = (user.failedAttempts || 0) + 1;
+            
+            // Set lockout if max attempts reached
+            if (user.failedAttempts >= process.env.MAX_ATTEMPTS) {
+                user.lockoutUntil = Date.now() + process.env.LOCKOUT_DURATION;
+            }
+            
+            await user.save();
+            return res.status(400).json({ 
+                message: `Invalid OTP. ${process.env.MAX_ATTEMPTS - user.failedAttempts} attempts remaining.` 
+            });
+        }
+
+        // Update password and clear reset data
+        user.password = await bcrypt.hash(newPassword, 10);
+        user.resetOtp = undefined;
+        user.otpExpiry = undefined;
+        user.failedAttempts = 0;
+        user.lockoutUntil = undefined;
+        await user.save();
+
+        return res.status(200).json({ message: "Password reset successfully!" });
+
+    } catch (error) {
+        console.error('Reset password error:', error);
+        return res.status(500).json({ message: "Internal Server Error" });
+    }
+};
 module.exports = {
     test,
     registerUser,
     loginUser,
-    getProfile, 
+    getProfile,
     logoutUser,
     updateUser,
     getAllUsers,
     deleteUser,
     resetUserScore,
-    addUserByAdmin
-}
+    addUserByAdmin,
+    forgotPassword,
+    resetPassword,
+    verifyTotp
+};
