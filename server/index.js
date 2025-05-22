@@ -66,15 +66,7 @@ app.use(
 
 //cookie security
 app.use(cookieParser());
-app.use((req, res, next) => {
-  res.cookie('auth_token', 'token_value', {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'none',
-    maxAge: 24 * 60 * 60 * 1000 // 1 ngày
-  });
-  next();
-});
+
 
 // CORS Configuration
 const corsOptions = {
