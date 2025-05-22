@@ -70,7 +70,7 @@ app.use((req, res, next) => {
   res.cookie('auth_token', 'token_value', {
     httpOnly: true,
     secure: true,
-    sameSite: 'strict',
+    sameSite: 'none',
     maxAge: 24 * 60 * 60 * 1000 // 1 ngày
   });
   next();
@@ -79,7 +79,6 @@ app.use((req, res, next) => {
 // CORS Configuration
 const corsOptions = {
   origin: [
-    'https://localhost:5317',
     'https://localhost:5173'
   ],
   credentials: true,
