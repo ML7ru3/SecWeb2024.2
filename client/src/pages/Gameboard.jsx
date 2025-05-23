@@ -40,7 +40,7 @@ export default function GameBoard() {
 
         // Send the PUT request to update the user
         const res = await axios.put('/update', updatedData);
-
+        console.log('Updated the data of the user!')
         // Handle the response
         if (res.data.error) {
             toast.error(res.data.error); // Show error message if the backend returns an error
@@ -53,12 +53,12 @@ export default function GameBoard() {
     }
 }
 
-  const handleSaveGame = () => {
+  const handleSaveGame = async () => {
     if (!user) {
       toast.error('You need to login to save game!');
       return;
     }
-    saveUser();
+    await saveUser();
     toast.success('Game saved!');
   };
   
@@ -135,7 +135,7 @@ export default function GameBoard() {
         </div>
 
         {/*Here's the gameplay*/}
-        <GameContext.Provider value = {[incrementScore, initialized, setInitialized, cellValues, setCellValues, resetGame]} >
+        <GameContext.Provider value = {[incrementScore, initialized, setInitialized, cellValues, setCellValues, resetGame, saveUser]} >
             <Game />
         </GameContext.Provider>
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useContext} from 'react';
+import React, { useEffect, useContext, useState} from 'react';
 import './Game.css';
 import { GameContext } from '../Gameboard'; 
 import { UserContext } from '../../../context/UserContext';
@@ -7,9 +7,9 @@ import { UserContext } from '../../../context/UserContext';
 
 
 export default function Game() {
-    const  [incrementScore, initialized, setInitialized, cellValues, setCellValues, resetGame]  = useContext(GameContext);   
-
-    const randomNumberGenerator = () => {
+    const  [incrementScore, initialized, setInitialized, cellValues, setCellValues, resetGame, saveUser]  = useContext(GameContext);   
+    const [gameOver, setGameOver] = useState(false);
+    const randomNumberGenerator = async () => {
         setCellValues((prevCellValues) => {
             const newCellValues = [...prevCellValues.map(row => [...row])]; // Deep copy of the grid
             let col = Math.floor(Math.random() * 4), row = Math.floor(Math.random() * 4);
@@ -21,7 +21,7 @@ export default function Game() {
             }
             if (MAX_COUNT > 1000) {
                 alert("Game Over!");
-                resetGame();
+                setGameOver(true);
                 return prevCellValues; // Return the previous state if no empty cell is found
             }
             newCellValues[col][row] = Math.random() < 0.9 ? 2 : 4; // Add a random number (2 or 4)
@@ -173,7 +173,19 @@ export default function Game() {
         return () => {
             window.removeEventListener('keydown', handleKeyPress);
         };
+
     }, [initialized]);
+    
+    useEffect(() => {
+        const handleGameOver = async () => {
+            if (gameOver) {
+                resetGame();
+                await saveUser();
+                setGameOver(false);
+            }
+        };
+        handleGameOver();
+    }, [gameOver, saveUser, resetGame]);
 
     const cells = [];
     for (let i = 0; i < 4; i++) {
