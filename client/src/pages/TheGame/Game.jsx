@@ -7,7 +7,7 @@ import { UserContext } from '../../../context/UserContext';
 
 
 export default function Game() {
-    const  [incrementScore, initialized, setInitialized, cellValues, setCellValues]  = useContext(GameContext);   
+    const  [incrementScore, initialized, setInitialized, cellValues, setCellValues, resetGame]  = useContext(GameContext);   
 
     const randomNumberGenerator = () => {
         setCellValues((prevCellValues) => {
@@ -21,6 +21,7 @@ export default function Game() {
             }
             if (MAX_COUNT > 1000) {
                 alert("Game Over!");
+                resetGame();
                 return prevCellValues; // Return the previous state if no empty cell is found
             }
             newCellValues[col][row] = Math.random() < 0.9 ? 2 : 4; // Add a random number (2 or 4)

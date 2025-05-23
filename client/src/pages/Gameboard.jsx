@@ -135,7 +135,7 @@ export default function GameBoard() {
         </div>
 
         {/*Here's the gameplay*/}
-        <GameContext.Provider value = {[incrementScore, initialized, setInitialized, cellValues, setCellValues]} >
+        <GameContext.Provider value = {[incrementScore, initialized, setInitialized, cellValues, setCellValues, resetGame]} >
             <Game />
         </GameContext.Provider>
 
