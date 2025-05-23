@@ -67,12 +67,12 @@ export default function GameBoard() {
     setBestUserScore(Math.max(bestUserScore, userScore));
 
     //for the user
-    const loadLastGameSession = () => {
+    const loadLastGameSession = async () => {
       if (user && !isLogin.current){
         if (user.lastGameSaved) {
-            setCellValues(() => user.lastGameSaved);
-            setUserScore(() => user.scoreFromLastGameSaved);
-            setBestUserScore(() => user.highscore);
+            await setCellValues(() => user.lastGameSaved);
+            await setUserScore(() => user.scoreFromLastGameSaved);
+            await setBestUserScore(() => user.highscore);
         }
         isLogin.current = true;
         setInitialized(true);
@@ -91,7 +91,7 @@ export default function GameBoard() {
     loadLastGameSession();
     continuouslySaveGame();
 
-  }, [userScore, user, bestUserScore, cellValues]);
+  }, [userScore, user, bestUserScore]);
 
   function resetGame() {
     setInitialized(false);

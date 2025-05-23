@@ -238,14 +238,14 @@ const verifyTotp = async (req, res) => {
         const token = jwt.sign(
             { email: user.email, id: user._id, name: user.name },
             process.env.JWT_SECRET,
-            { expiresIn: '1h' }
+            { expiresIn: '3h' }
         );
 
         // Set auth cookie
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            maxAge: 3600000,
+            maxAge: 1000 * 60 * 60 * 3, // 3 hours of gaming
         });
 
         return res.status(200).json({ message: 'Login successful', user });
