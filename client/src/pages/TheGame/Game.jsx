@@ -1,13 +1,15 @@
-import React, { useEffect, useContext} from 'react';
+import React, { useEffect, useContext } from 'react';
 import './Game.css';
-import { GameContext } from '../Gameboard'; 
-import { UserContext } from '../../../context/UserContext';
-
-
-
+import GameContext from '../../../context/GameContext';
 
 export default function Game() {
-    const  [incrementScore, initialized, setInitialized, cellValues, setCellValues]  = useContext(GameContext);   
+    const { 
+        incrementScore, 
+        initialized, 
+        setInitialized, 
+        cellValues, 
+        setCellValues 
+    } = useContext(GameContext);   
 
     const randomNumberGenerator = () => {
         setCellValues((prevCellValues) => {
@@ -28,8 +30,6 @@ export default function Game() {
         });
     };
 
-    //TODO: Implement swiping for mobile phone
-
     const handleKeyPress = (event) => {
         const validKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 
@@ -38,7 +38,6 @@ export default function Game() {
             return; // Exit early if the key is not valid
         }
 
-        
         setCellValues((prevCellValues) => {
             let newCellValues = prevCellValues.map(row => [...row]); // Proper deep copy of the grid
         
@@ -158,11 +157,11 @@ export default function Game() {
         randomNumberGenerator();
     };
 
-    //check reset and add listener
+    // Check reset and add listener
     useEffect(() => {
         if (!initialized) {
-            console.log('Initilizing the game...')
-            setCellValues(() => Array(4).fill(null).map(() => Array(4).fill('')));
+            console.log('Initializing the game...')
+            setCellValues(Array(4).fill(null).map(() => Array(4).fill('')));
             setInitialized(true);
             randomNumberGenerator();
             randomNumberGenerator();
@@ -172,7 +171,7 @@ export default function Game() {
         return () => {
             window.removeEventListener('keydown', handleKeyPress);
         };
-    }, [initialized]);
+    }, [initialized, setCellValues, setInitialized]);
 
     const cells = [];
     for (let i = 0; i < 4; i++) {
@@ -181,7 +180,6 @@ export default function Game() {
                 <div className={`cell value-${cellValues[i][j] || 0}`} key={`${i}-${j}`}>
                     {cellValues[i][j]}
                 </div>
-
             );
         }
     }
@@ -193,6 +191,4 @@ export default function Game() {
             </div>
         </div>
     );
-
-    
 }

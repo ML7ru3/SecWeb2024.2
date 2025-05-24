@@ -44,7 +44,7 @@ const AdminDashboard = () => {
 
   return (
     <div>
-      <button className="back-button" onClick={() => navigate('/')}>
+      <button className="back-button" onClick={() => navigate('/gameboard')}>
         Go to Gameboard
       </button>
 

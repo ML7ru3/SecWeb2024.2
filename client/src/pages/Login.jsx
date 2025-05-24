@@ -17,6 +17,8 @@ export default function Login() {
     const [totpCode, setTotpCode] = useState('');
 
     const [timer, setTimer] = useState(300); 
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
 
 
     const [data, setData] = useState({
@@ -83,6 +85,7 @@ export default function Login() {
     
     const loginUser = async (e) => {
         e.preventDefault();
+        setIsSubmitting(true);
         const { email, password } = data;
         const turnstileToken = e.target.querySelector('[name="cf-turnstile-response"]')?.value;
 
@@ -109,11 +112,14 @@ export default function Login() {
             }
         } catch (error) {
             toast.error('An error occurred. Please try again!');
+        } finally {
+            setIsSubmitting(false); 
         }
     };
 
     const verifyTotpCode = async (e) => {
         e.preventDefault();
+        setIsSubmitting(true); // Bắt đầu loading
 
         try {
             const response = await axios.post('/login-mfa', {
@@ -126,17 +132,16 @@ export default function Login() {
                 toast.error(resData.error);
                 return;
             }
-            // if server signals rate limit -> reset to login
-            if(resData.retryAfter){
+
+            if (resData.retryAfter) {
                 setRetryAfter(resData.retryAfter);
                 setStep(1);
                 setTempToken('');
                 setTotpCode('');
-                toast.error(resData.message || 'Too many failed attempts.Try again later');
+                toast.error(resData.message || 'Too many failed attempts. Try again later');
                 return;
             }
 
-            // Fetch user profile after successful MFA
             const profileRes = await axios.get('/profile');
             setUser(profileRes.data);
             toast.success("Login successful!");
@@ -144,7 +149,6 @@ export default function Login() {
             setTotpCode('');
             setStep(1);
 
-            // Redirect based on role
             if (profileRes.data.role === 'admin') {
                 navigate('/admin/dashboard');
             } else {
@@ -152,8 +156,11 @@ export default function Login() {
             }
         } catch (error) {
             toast.error('TOTP verification failed. Please try again!');
+        } finally {
+            setIsSubmitting(false); // Kết thúc loading
         }
     };
+
 
     return (
         <div className="login-container">
@@ -195,8 +202,8 @@ export default function Login() {
                         </Link>
                     </div>
 
-                    <button type="submit" disabled={isRateLimited}>
-                        Login
+                    <button type="submit" disabled={isRateLimited || isSubmitting}>
+                        {isSubmitting ? 'Logging in...' : 'Login'}
                     </button>
                 </form>
             )}
@@ -221,7 +228,9 @@ export default function Login() {
                     </p>
 
                     <div className="form-actions">
-                        <button type="submit">Verify</button>
+                        <button type="submit" disabled={isSubmitting}>
+                            {isSubmitting ? 'Verifying...' : 'Verify'}
+                        </button>
                     </div>
                 </form>
             )}

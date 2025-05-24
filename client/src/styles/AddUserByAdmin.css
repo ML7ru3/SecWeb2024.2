@@ -108,3 +108,32 @@
     background-position: 0% 50%;
   }
 }
+
+/* Error styles */
+.form-error-message {
+  padding: 12px;
+  background-color: #ffebee;
+  color: #c62828;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  text-align: center;
+  font-weight: 500;
+  border: 1px solid #ef9a9a;
+}
+
+.field-error {
+  color: #c62828;
+  font-size: 0.85rem;
+  margin-top: -12px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.input-error {
+  border-color: #c62828 !important;
+  background-color: #ffebee !important;
+}
+
+.input-error:focus {
+  box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.2) !important;
+}
