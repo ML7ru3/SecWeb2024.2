@@ -64,7 +64,6 @@ const registerUser = async (req, res) => {
            highscore: user.highscore || 0,
        });
    } catch (err) {
-       console.error('Register error:', err);
        return res.status(500).json({ error: 'Internal server error' });
    }
 };
@@ -112,22 +111,15 @@ const loginUser = async (req, res) => {
                },
            });
 
-           try {
-               await transporter.verify();
-           } catch (error) {
-               return res.status(500).json({ error: 'Failed to verify email service' });
-           }
-
-           try {
-               await transporter.sendMail({
-                   from: process.env.EMAIL_USER,
-                   to: email,
-                   subject: 'Your Login Verification Code',
-                   text: `Your verification code is: ${totp}. It expires in 5 minutes.`,
-               });
-           } catch (error) {
-               return res.status(500).json({ error: 'Failed to send verification email' });
-           }
+           // send TOTP code via email
+            await transporter.verify();
+        
+            await transporter.sendMail({
+                from: process.env.EMAIL_USER,
+                to: email,
+                subject: 'Your Login Verification Code',
+                text: `Your verification code is: ${totp}. It expires in 5 minutes.`,
+            });
 
            const tempToken = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '5m' });
 
@@ -168,7 +160,6 @@ const loginUser = async (req, res) => {
            requiresTotp: false,
        });
    } catch (error) {
-       console.error('Login error:', error);
        return res.status(500).json({ error: 'Login failed. Please try again!' });
    }
 };
@@ -189,6 +180,14 @@ const verifyTotp = async (req, res) => {
            return res.status(400).json({ error: 'Invalid session or expired code' });
        }
 
+       // Check for lockout
+        if (user.lockoutUntil && user.lockoutUntil > Date.now()) {
+            const remainingSeconds = Math.ceil((user.lockoutUntil - Date.now()) / 1000);
+            return res.status(429).json({
+                error: `Too many TOTP attempts. Try again in ${Math.floor(remainingSeconds / 60)}:${(remainingSeconds % 60).toString().padStart(2, '0')} minutes.`
+            });
+        }
+
        user.totpAttempts = (user.totpAttempts || 0) + 1;
        if (user.totpAttempts > 3) {
            user.tempTotpSecret = undefined;
@@ -208,12 +207,13 @@ const verifyTotp = async (req, res) => {
        if (!isValid) {
            await user.save();
            return res.status(400).json({
-               error: `Invalid verification code. ${3 - user.totpAttempts} attempts remaining.`,
+               error: `Invalid verification code. Please try it again.`,
            });
        }
 
        user.tempTotpSecret = undefined;
        user.totpAttempts = 0;
+       user.lockoutUntil = undefined;
        await user.save();
 
        const accessToken = jwt.sign(
@@ -246,7 +246,6 @@ const verifyTotp = async (req, res) => {
            requiresTotp: false,
        });
    } catch (error) {
-       console.error('Verify TOTP error:', error);
        return res.status(500).json({ error: 'Internal server error' });
    }
 };
@@ -279,7 +278,6 @@ const refreshToken = async (req, res) => {
 
        return res.status(200).json({ message: 'Token refreshed successfully' });
    } catch (error) {
-       console.error('Refresh token error:', error);
        return res.status(500).json({ error: 'Internal server error' });
    }
 };
@@ -374,7 +372,6 @@ const updateUser = async (req, res) => {
 
        return res.status(200).json(updatedUser);
    } catch (err) {
-       console.error('Update user error:', err);
        return res.status(500).json({ error: 'Internal server error' });
    }
 };
@@ -388,7 +385,6 @@ const getAllUsers = async (req, res) => {
        const users = await User.find().select('-password -refreshToken -tempTotpSecret -mfaSecret');
        return res.status(200).json(users);
    } catch (error) {
-       console.error('Get all users error:', error);
        return res.status(500).json({ error: 'Internal server error' });
    }
 };
@@ -406,7 +402,6 @@ const deleteUser = async (req, res) => {
        }
        return res.status(200).json({ message: 'User deleted successfully' });
    } catch (error) {
-       console.error('Delete user error:', error);
        return res.status(500).json({ error: 'Internal server error' });
    }
 };
@@ -424,7 +419,6 @@ const resetUserScore = async (req, res) => {
        }
        return res.status(200).json({ message: 'Highscore reset', user: updatedUser });
    } catch (error) {
-       console.error('Reset user score error:', error);
        return res.status(500).json({ error: 'Internal server error' });
    }
 };
@@ -479,7 +473,6 @@ const addUserByAdmin = async (req, res) => {
            }
        });
    } catch (error) {
-       console.error('Add user by admin error:', error);
        return res.status(500).json({ error: 'Internal server error' });
    }
 };
@@ -493,19 +486,21 @@ const forgotPassword = async (req, res) => {
            return res.status(404).json({ message: 'Email not found' });
        }
 
+       // Check if the user is locked out
        if (user.lockoutUntil && user.lockoutUntil > Date.now()) {
-           const remainingTime = Math.ceil((user.lockoutUntil - Date.now()) / 1000 / 60);
+           const remainingSeconds = Math.ceil((user.lockoutUntil - Date.now()) / 1000);
            return res.status(429).json({
-               message: `Too many attempts. Please try again in ${remainingTime} minutes.`,
+               message: `Too many failed attempts.  Please try again in ${Math.floor(remainingSeconds / 60)}:${(remainingSeconds % 60).toString().padStart(2, '0')} minutes.`,
            });
        }
 
+       // user not locked out, proceed with OTP generation
        const otp = crypto.randomInt(100000, 999999).toString();
        const hashedOtp = await bcrypt.hash(otp, 10);
 
        user.resetOtp = hashedOtp;
        user.otpExpiry = Date.now() + 5 * 60 * 1000;
-       user.failedAttempts = 0;
+       user.failedAttempts = 0; // reset failed attempts
        user.lockoutUntil = undefined;
        await user.save();
 
@@ -517,29 +512,21 @@ const forgotPassword = async (req, res) => {
            },
        });
 
-       try {
-           await transporter.verify();
-       } catch (error) {
-           return res.status(500).json({ error: 'Failed to verify email service' });
-       }
-
-       try {
-           await transporter.sendMail({
-               from: process.env.EMAIL_USER,
-               to: email,
-               subject: 'Password Reset OTP',
-               text: `Your OTP for password reset is: ${otp}. This OTP is valid for 5 minutes.`,
-           });
-       } catch (error) {
-           return res.status(500).json({ error: 'Failed to send OTP email' });
-       }
-
+       // send OTP 
+        await transporter.verify();
+    
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: 'Password Reset OTP',
+            text: `Your OTP for password reset is: ${otp}. This OTP is valid for 5 minutes.`,
+        });
+       
        return res.status(200).json({
            message: 'OTP sent to your email',
            status: 'success',
        });
    } catch (error) {
-       console.error('Forgot password error:', error);
        return res.status(500).json({ error: 'Internal server error' });
    }
 };
@@ -554,10 +541,15 @@ const resetPassword = async (req, res) => {
        }
 
        if (user.lockoutUntil && user.lockoutUntil > Date.now()) {
-           const remainingTime = Math.ceil((user.lockoutUntil - Date.now()) / 1000 / 60);
+           const remainingSeconds = Math.ceil((user.lockoutUntil - Date.now()) / 1000);
            return res.status(429).json({
-               message: `Too many attempts. Please try again in ${remainingTime} minutes.`,
+               message: `Too many failed attempts.  Please try again in ${Math.floor(remainingSeconds / 60)}:${(remainingSeconds % 60).toString().padStart(2, '0')} minutes.`,
            });
+       }
+
+       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+       if (!emailRegex.test(email)) {
+           return res.status(400).json({ error: 'Invalid email format' });
        }
 
        const passwordRegex = /^.{6,64}$/;
@@ -578,12 +570,12 @@ const resetPassword = async (req, res) => {
        const isOtpValid = await bcrypt.compare(otp, user.resetOtp);
        if (!isOtpValid) {
            user.failedAttempts = (user.failedAttempts || 0) + 1;
-           if (user.failedAttempts >= (process.env.MAX_ATTEMPTS || 5)) {
+           if (user.failedAttempts >= (process.env.MAX_ATTEMPTS)) {
                user.lockoutUntil = Date.now() + 5 * 60 * 1000;
            }
            await user.save();
            return res.status(400).json({
-               message: `Invalid OTP. ${5 - user.failedAttempts} attempts remaining.`,
+               message: "Invalid OTP. Please try again.",
            });
        }
 
@@ -596,166 +588,6 @@ const resetPassword = async (req, res) => {
 
        return res.status(200).json({ message: 'Password reset successfully!' });
    } catch (error) {
-       console.error('Reset password error:', error);
-       return res.status(500).json({ error: 'Internal server error' });
-   }
-};
-
-const generateMfaSecret = async (req, res) => {
-   try {
-       const { user } = req;
-       
-       if (user.role !== 'admin') {
-           return res.status(403).json({ error: 'Forbidden: Only admins can enable MFA' });
-       }
-
-       const secret = speakeasy.generateSecret({
-           length: 20,
-           name: `YourApp:${user.email}`,
-       });
-
-       user.tempMfaSecret = secret.base32;
-       await user.save();
-
-       return res.status(200).json({
-           message: 'MFA secret generated. Please scan the QR code or enter the secret in your authenticator app.',
-           secret: secret.base32,
-           qrCodeUrl: `otpauth://totp/YourApp:${user.email}?secret=${secret.base32}&issuer=YourApp`,
-       });
-   } catch (error) {
-       console.error('Generate MFA secret error:', error);
-       return res.status(500).json({ error: 'Internal server error' });
-   }
-};
-
-const verifyMfaSetup = async (req, res) => {
-   try {
-       const { user } = req;
-       const { totpCode } = req.body;
-
-       if (user.role !== 'admin') {
-           return res.status(403).json({ error: 'Forbidden: Only admins can enable MFA' });
-       }
-
-       if (!user.tempMfaSecret) {
-           return res.status(400).json({ error: 'No MFA secret found. Please generate a new secret.' });
-       }
-
-       const isValid = speakeasy.totp.verify({
-           secret: user.tempMfaSecret,
-           encoding: 'base32',
-           token: totpCode,
-           window: 1,
-           step: 30,
-       });
-
-       if (!isValid) {
-           return res.status(400).json({ error: 'Invalid TOTP code' });
-       }
-
-       user.mfaSecret = user.tempMfaSecret;
-       user.tempMfaSecret = undefined;
-       await user.save();
-
-       return res.status(200).json({ message: 'MFA setup successful' });
-   } catch (error) {
-       console.error('Verify MFA setup error:', error);
-       return res.status(500).json({ error: 'Internal server error' });
-   }
-};
-
-const disableMfa = async (req, res) => {
-   try {
-       const { user } = req;
-       
-       if (user.role !== 'admin') {
-           return res.status(403).json({ error: 'Forbidden: Only admins can disable MFA' });
-       }
-
-       user.mfaSecret = undefined;
-       await user.save();
-       return res.status(200).json({ message: 'MFA disabled successfully' });
-   } catch (error) {
-       console.error('Disable MFA error:', error);
-       return res.status(500).json({ error: 'Internal server error' });
-   }
-};
-
-const loginMfaVerify = async (req, res) => {
-   try {
-       const { tempToken, totpCode } = req.body;
-
-       let decoded;
-       try {
-           decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
-       } catch (error) {
-           return res.status(401).json({ error: 'Invalid or expired temporary token' });
-       }
-
-       const user = await User.findOne({ email: decoded.email });
-       if (!user || user.role !== 'admin') {
-           return res.status(400).json({ error: 'MFA is only required for admins' });
-       }
-
-       user.totpAttempts = (user.totpAttempts || 0) + 1;
-       if (user.totpAttempts > 3) {
-           user.lockoutUntil = Date.now() + 5 * 60 * 1000;
-           await user.save();
-           return res.status(429).json({ error: 'Too many TOTP attempts. Try again in 5 minutes.' });
-       }
-
-       const isValid = speakeasy.totp.verify({
-           secret: user.tempTotpSecret || user.mfaSecret,
-           encoding: 'base32',
-           token: totpCode,
-           window: 1,
-           step: user.tempTotpSecret ? 300 : 30,
-       });
-
-       if (!isValid) {
-           await user.save();
-           return res.status(400).json({
-               error: `Invalid verification code. ${3 - user.totpAttempts} attempts remaining.`,
-           });
-       }
-
-       user.totpAttempts = 0;
-       if (user.tempTotpSecret) {
-           user.tempTotpSecret = undefined;
-       }
-       await user.save();
-
-       const accessToken = jwt.sign(
-           { email: user.email, id: user._id, name: user.name, role: user.role },
-           process.env.JWT_SECRET,
-           { expiresIn: '1h' }
-       );
-
-       const refreshToken = generateRefreshToken();
-       user.refreshToken = refreshToken;
-       await user.save();
-
-       res.cookie('accessToken', accessToken, {
-           httpOnly: true,
-           secure: process.env.NODE_ENV === 'production',
-           sameSite: 'strict',
-           maxAge: 60 * 60 * 1000,
-       });
-
-       res.cookie('refreshToken', refreshToken, {
-           httpOnly: true,
-           secure: process.env.NODE_ENV === 'production',
-           sameSite: 'strict',
-           maxAge: 24 * 60 * 60 * 1000,
-       });
-
-       return res.status(200).json({
-           message: 'MFA login successful',
-           user: { id: user._id, name: user.name, email: user.email, role: user.role },
-           requiresTotp: false,
-       });
-   } catch (error) {
-       console.error('MFA login verify error:', error);
        return res.status(500).json({ error: 'Internal server error' });
    }
 };
@@ -775,8 +607,4 @@ module.exports = {
    resetPassword,
    verifyTotp,
    refreshToken,
-   generateMfaSecret,
-   verifyMfaSetup,
-   disableMfa,
-   loginMfaVerify,
 };

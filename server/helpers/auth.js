@@ -103,6 +103,12 @@ const totpLimiter = rateLimit({
     message: 'Too many TOTP verification attempts, please try again after 5 minutes',
 });
 
+const forgotPasswordLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    max: 5,
+    message: 'Too many password reset attempts, please try again after 5 minutes',
+});
+
 module.exports = {
     hashPassword,
     comparePassword,
@@ -113,5 +119,6 @@ module.exports = {
     adminUsersLimiter,
     updateLimiter,
     totpLimiter,
+    forgotPasswordLimiter,
     generateRefreshToken,
 };

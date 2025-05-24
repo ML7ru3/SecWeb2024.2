@@ -15,10 +15,6 @@ const express = require('express');
        resetPassword,
        verifyTotp,
        refreshToken,
-       generateMfaSecret,
-       verifyMfaSetup,
-       disableMfa,
-       loginMfaVerify
    } = require('../controllers/authController');
    const {
        requireAuth,
@@ -27,26 +23,23 @@ const express = require('express');
        loginLimiter,
        adminUsersLimiter,
        updateLimiter,
-       totpLimiter
+       totpLimiter,
+       forgotPasswordLimiter
    } = require('../helpers/auth');
 
    // Public routes
    router.get('/', test);
    router.post('/register', registerLimiter, registerUser);
    router.post('/login', loginLimiter, loginUser);
-   router.post('/login-mfa', loginLimiter, verifyTotp);
+   router.post('/login-mfa', verifyTotp);
    router.post('/forgot-password', forgotPassword);
-   router.post('/reset-password', resetPassword);
+   router.post('/reset-password',forgotPasswordLimiter, resetPassword);
    router.post('/refresh-token', totpLimiter, refreshToken); 
 
    // Protected routes
    router.get('/profile', requireAuth, getProfile);
    router.post('/logout', requireAuth, logoutUser);
    router.put('/update', requireAuth, updateLimiter, updateUser);
-   router.post('/mfa/setup', requireAuth, generateMfaSecret);
-   router.post('/mfa/verify', requireAuth, verifyMfaSetup);
-   router.post('/mfa/disable', requireAuth, disableMfa);
-   router.post('/mfa/login-verify', loginLimiter, loginMfaVerify);
 
    // Admin routes
    router.use('/admin', requireAuth, requireAdmin);

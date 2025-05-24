@@ -5,15 +5,18 @@ import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
 const ForgotPassword = () => {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(1); // step 1: email input, step 2: OTP and new password
+  
+  // store user input
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [infoMessage, setInfoMessage] = useState('');
-  const [timer, setTimer] = useState(0);
-  const [canResend, setCanResend] = useState(true);
+
+  const [loading, setLoading] = useState(false); // show loading spinner on submit
+  const [infoMessage, setInfoMessage] = useState(''); // display info to user
+  const [timer, setTimer] = useState(0); // countdown time for OTP expiration
+
   const navigate = useNavigate();
 
   // Countdown effect
@@ -23,8 +26,9 @@ const ForgotPassword = () => {
       countdown = setInterval(() => {
         setTimer(prev => {
           if (prev <= 1) {
-            setCanResend(true);
             clearInterval(countdown);
+            setStep(1);
+            setInfoMessage('OTP expired. Please request a new one.');
             return 0;
           }
           return prev - 1;
@@ -51,7 +55,7 @@ const ForgotPassword = () => {
       toast.success(response.data.message);
       setStep(2);
       setTimer(5 * 60);
-      setCanResend(false);
+
       // clear old inputs
       setOtp('');
       setNewPassword('');
@@ -67,18 +71,6 @@ const ForgotPassword = () => {
     e.preventDefault();
     setLoading(true);
 
-    if (timer <= 0) {
-      toast.error("OTP has expired. Please request a new one.");
-      setStep(1);
-      setTimer(0);
-      setCanResend(true);
-      setOtp('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setLoading(false);
-      return;
-    }
-
     try {
       const response = await axios.post('/reset-password', {
         email,
@@ -93,27 +85,33 @@ const ForgotPassword = () => {
       }, 1000);
     } catch (error) {
       const errorResponse = error.response?.data;
-      const errorMessage = errorResponse?.message || "Error resetting password";
+      const errorMessage = errorResponse?.message  || "Error resetting password";
       toast.error(errorMessage);
 
-      if (status === 429 || errorMessage.toLowerCase().includes("too many attempts")) {
+      // handle OTP expiration from backend
+      if (
+        errorMessage.toLowerCase().includes("otp expired") ||
+        errorMessage.toLowerCase().includes("please request a new one.")
+      ) {
+
         setStep(1);
         setTimer(0);
-        setCanResend(true); 
         setOtp('');
         setNewPassword('');
         setConfirmPassword('');
       }
 
-      if (errorResponse?.maxAttemptsReached) {
-        toast.error("Too many failed attempts. Please request a new OTP.");
+      // handle lockout or too many attempts
+      if (
+        errorMessage.toLowerCase().includes("too many failed attempts.") 
+      ) {
         setStep(1);
         setTimer(0);
-        setCanResend(false); 
         setOtp('');
         setNewPassword('');
         setConfirmPassword('');
       }
+
     } finally {
       setLoading(false);
     }

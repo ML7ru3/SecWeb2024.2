@@ -6,9 +6,9 @@ const { hashPassword } = require('./helpers/auth');
 async function createAdmin() {
     await mongoose.connect(process.env.MONGO_URL);
 
-    const email = 'admin@gmail.com';
+    const email = 'Ha.PT225571@sis.hust.edu.vn';
     const name = 'admin';
-    const plainPassword = 'admin123';
+    const plainPassword = 'Ha2004';
 
     const exist = await User.findOne({ email });
     if (exist) {
