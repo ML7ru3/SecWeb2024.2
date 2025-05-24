@@ -39,9 +39,11 @@ export default function Logout() {
             try {
                 await axios.post('/logout');
                 setUser(null);
+                document.cookie = 'accessToken=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+                document.cookie = 'refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
                 localStorage.setItem("logout", Date.now());
-                toast.success("Đăng xuất thành công!");
-                navigate("/login");
+                toast.success("Logout successful!");
+                navigate("/login", { replace: true });
             } catch (err) {
                 console.error(err);
                 toast.error("Có lỗi xảy ra khi đăng xuất.");

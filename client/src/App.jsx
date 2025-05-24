@@ -224,13 +224,22 @@ function MainApp() {
     // Protected route component
     const ProtectedRoute = ({ children, requireAdmin = false }) => {
         console.log('[DEBUG] ProtectedRoute - user:', user, 'path:', location.pathname);
+        
         if (!user) {
-            const redirectTo = location.pathname + location.search;
-            return <Navigate to={`/login?redirect=${encodeURIComponent(redirectTo)}`} replace />;
+            // CHỈ thêm redirect URL nếu KHÔNG phải là admin route
+            const isAdminRoute = location.pathname.startsWith('/admin');
+            if (isAdminRoute) {
+                return <Navigate to="/login" replace />;
+            } else {
+                const redirectTo = location.pathname + location.search;
+                return <Navigate to={`/login?redirect=${encodeURIComponent(redirectTo)}`} replace />;
+            }
         }
+        
         if (requireAdmin && user.role !== 'admin') {
             return <Navigate to="/gameboard" replace />;
         }
+        
         return children;
     };
 

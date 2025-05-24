@@ -16,10 +16,8 @@ export default function Login() {
     const [tempToken, setTempToken] = useState('');
     const [totpCode, setTotpCode] = useState('');
 
-    const [timer, setTimer] = useState(300); 
+    const [timer, setTimer] = useState(300);
     const [isSubmitting, setIsSubmitting] = useState(false);
-
-
 
     const [data, setData] = useState({
         email: '',
@@ -46,6 +44,8 @@ export default function Login() {
                     if (prev <= 1) {
                         clearInterval(countdown);
                         setStep(1);
+                        setTempToken('');
+                        setTotpCode('');
                         toast.error("Verification code expired. Please login again.");
                         return 0;
                     }
@@ -82,51 +82,67 @@ export default function Login() {
             return () => clearInterval(timer);
         }
     }, [retryAfter]);
-    
+
     const loginUser = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
+
         const { email, password } = data;
         const turnstileToken = e.target.querySelector('[name="cf-turnstile-response"]')?.value;
 
         if (!turnstileToken) {
             toast.error("Please complete the Turnstile challenge");
+            setIsSubmitting(false);
             return;
         }
 
         try {
-            const response = await axios.post('/login', { email, password, turnstileToken });
+            const response = await axios.post('/login', { email, password, turnstileToken }, { withCredentials: true });
             const resData = response.data;
+            console.log('Login response:', resData);
 
             if (resData.error) {
                 toast.error(resData.error);
-            } else if (resData.message && resData.tempToken) {
+            } else if (resData.requiresTotp && resData.tempToken) {
                 setTempToken(resData.tempToken);
                 setStep(2);
-                toast.error(resData.message);
-            } else if (resData.message && resData.retryAfter) {
+                toast.success(resData.message);
+            } else if (resData.message === 'Login successful' && !resData.requiresTotp) {
+                const profileRes = await axios.get('/profile', { withCredentials: true });
+                setUser(profileRes.data);
+                toast.success("Login successful!");
+                setData({ email: '', password: '' });
+                if (profileRes.data.role === 'admin') {
+                    navigate('/admin/dashboard');
+                } else {
+                    navigate('/gameboard');
+                }
+            } else if (resData.retryAfter) {
                 setRetryAfter(resData.retryAfter);
                 toast.error(resData.message);
             } else {
                 toast.error("Unexpected response from server");
             }
         } catch (error) {
-            toast.error('An error occurred. Please try again!');
+            const errorMsg = error.response?.data?.error || 'An error occurred. Please try again!';
+            toast.error(errorMsg);
+            console.error('Login error:', error.response?.data);
         } finally {
-            setIsSubmitting(false); 
+            setIsSubmitting(false);
         }
     };
 
     const verifyTotpCode = async (e) => {
         e.preventDefault();
-        setIsSubmitting(true); // Bắt đầu loading
+        setIsSubmitting(true);
 
         try {
-            const response = await axios.post('/login-mfa', {
+            const response = await axios.post('/mfa/login-verify', {
                 tempToken,
                 totpCode,
-            });
+            }, { withCredentials: true });
             const resData = response.data;
+            console.log('TOTP verify response:', resData);
 
             if (resData.error) {
                 toast.error(resData.error);
@@ -142,7 +158,7 @@ export default function Login() {
                 return;
             }
 
-            const profileRes = await axios.get('/profile');
+            const profileRes = await axios.get('/profile', { withCredentials: true });
             setUser(profileRes.data);
             toast.success("Login successful!");
             setData({ email: '', password: '' });
@@ -155,17 +171,18 @@ export default function Login() {
                 navigate('/gameboard');
             }
         } catch (error) {
-            toast.error('TOTP verification failed. Please try again!');
+            const errorMsg = error.response?.data?.error || 'TOTP verification failed. Please try again!';
+            toast.error(errorMsg);
+            console.error('TOTP verify error:', error.response?.data);
         } finally {
-            setIsSubmitting(false); // Kết thúc loading
+            setIsSubmitting(false);
         }
     };
-
 
     return (
         <div className="login-container">
             <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-            
+
             {step === 1 && (
                 <form className="login-form" onSubmit={loginUser}>
                     <h2>Login</h2>
@@ -219,8 +236,13 @@ export default function Login() {
                         id="totpCode"
                         name="totpCode"
                         value={totpCode}
-                        onChange={(e) => setTotpCode(e.target.value)}
+                        onChange={(e) => {
+                            console.log('TOTP input:', e.target.value);
+                            setTotpCode(e.target.value);
+                        }}
                         placeholder="Enter 6-digit code"
+                        maxLength={6}
+                        autoFocus
                         required
                     />
                     <p className="countdown-text">
