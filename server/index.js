@@ -106,7 +106,7 @@ const express = require('express');
        Server running in HTTPS mode
        Port: ${PORT}
        SSL: Enabled (TLS 1.2+)
-       Rate Limit: 50 requests/15min per IP
+       Rate Limit: 300 requests/15min per IP
        Allowed Origins: ${corsOptions.origin.join(', ')}
        `);
    });
