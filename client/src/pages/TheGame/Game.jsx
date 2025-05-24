@@ -1,4 +1,4 @@
-import React, { useEffect, useContext } from 'react';
+import React, { useEffect, useContext, useState } from 'react';
 import './Game.css';
 import GameContext from '../../../context/GameContext';
 
@@ -8,8 +8,10 @@ export default function Game() {
         initialized, 
         setInitialized, 
         cellValues, 
-        setCellValues 
+        setCellValues,
+        resetGame,
     } = useContext(GameContext);   
+    const [gameOver, setGameOver] = useState(false);
 
     const randomNumberGenerator = () => {
         setCellValues((prevCellValues) => {
@@ -23,6 +25,7 @@ export default function Game() {
             }
             if (MAX_COUNT > 1000) {
                 alert("Game Over!");
+                setGameOver(true);
                 return prevCellValues; // Return the previous state if no empty cell is found
             }
             newCellValues[col][row] = Math.random() < 0.9 ? 2 : 4; // Add a random number (2 or 4)
@@ -172,6 +175,12 @@ export default function Game() {
             window.removeEventListener('keydown', handleKeyPress);
         };
     }, [initialized, setCellValues, setInitialized]);
+
+    useEffect(() => {
+        if (!gameOver) return;
+        resetGame();
+        setGameOver(false);
+    })
 
     const cells = [];
     for (let i = 0; i < 4; i++) {

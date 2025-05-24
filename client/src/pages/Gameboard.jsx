@@ -117,6 +117,9 @@ export default function GameBoard() {
     setInitialized(true);
     addRandomNumber();
     addRandomNumber();
+    setTimeout(() => {
+      toast.success('A new game installed!')
+    }, 500);
   };
 
   const contextValue = useMemo(() => ({
@@ -125,7 +128,8 @@ export default function GameBoard() {
     setInitialized,
     cellValues,
     setCellValues,
-    addRandomNumber // Thêm hàm này vào context
+    addRandomNumber, // Thêm hàm này vào context
+    resetGame
   }), [incrementScore, initialized, cellValues]);
 
   if (!initialized) {
