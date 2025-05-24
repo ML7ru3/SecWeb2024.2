@@ -18,7 +18,7 @@ axios.defaults.withCredentials = true;
 axios.defaults.timeout = 10000;
 
 // Giới hạn request đồng thời
-const MAX_CONCURRENT_REQUESTS = 5;
+const MAX_CONCURRENT_REQUESTS = 10;
 let pendingRequests = 0;
 let isRefreshing = false;
 let failedQueue = [];
@@ -161,7 +161,7 @@ function MainApp() {
             const timeDiff = now - lastApiCallTime;
 
             // Giới hạn 2 request/giây
-            if (timeDiff < 500) {
+            if (timeDiff < 200) {
                 console.warn('[SECURITY] Request too fast! Delaying...');
                 await new Promise(resolve => setTimeout(resolve, 500 - timeDiff));
                 return call(apiFunction, ...args);
@@ -200,7 +200,7 @@ function MainApp() {
         };
 
         verifyUser();
-        const interval = setInterval(verifyUser, 300000); // Kiểm tra mỗi 5 phút
+        const interval = setInterval(verifyUser, 600000); // Kiểm tra mỗi 10 phút
         return () => clearInterval(interval);
     }, [user, location.pathname]);
 

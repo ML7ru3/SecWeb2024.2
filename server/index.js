@@ -40,28 +40,20 @@ const express = require('express');
    // Rate Limiting
    const limiter = rateLimit({
        windowMs: 15 * 60 * 1000, // 15 minutes
-       max: 50,
+       max: 300,
        message: 'Too many requests from this IP, please try again later',
        standardHeaders: true
    });
 
-   // Speed Limiter
-   const speedLimiter = slowDown({
-       windowMs: 15 * 60 * 1000,
-       delayAfter: 50,
-       delayMs: (used, req) => (used - req.slowDown.limit) * 1000,
-       validate: { delayMs: false }
-   });
-
    const loginLimiter = rateLimit({
        windowMs: 5 * 60 * 1000,
-       max: 10,
+       max: 20,
        message: 'Too many login attempts, please try again after 5 minutes',
        standardHeaders: true
    });
 
    // Apply limiters
-   app.use('/api/', limiter, speedLimiter);
+   app.use('/api/', limiter);
    app.use('/api/login', loginLimiter);
 
    // Timeout
