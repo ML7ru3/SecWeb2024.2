@@ -8,7 +8,7 @@ import Gameboard from './pages/Gameboard';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import axios from 'axios';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
 import { UserContextProvider, UserContext } from '../context/UserContext.jsx';
 import React, { useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { debounce, throttle } from 'lodash';
@@ -57,7 +57,7 @@ axios.interceptors.response.use(
     async error => {
         pendingRequests--;
         console.error('[DEBUG] Response error:', error.response?.status, error.response?.data);
-
+        if (error.response?.status === 401) toast.error(error.response?.data.error)
         const originalRequest = error.config;
         const { setUser, debouncedNavigate } = originalRequest.context || {};
 

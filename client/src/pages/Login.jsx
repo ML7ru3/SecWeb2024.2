@@ -35,6 +35,14 @@ export default function Login() {
         }
     }, [user, navigate]);
 
+
+    useEffect(() => {
+        if (!isSubmitting) return;
+        setTimeout(() => {
+            setIsSubmitting(false);
+        }, 2000);
+    }, [isSubmitting]);
+
     // Timer for TOTP code expiration
     useEffect(() => {
         if (step === 2) {
