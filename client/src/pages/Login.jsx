@@ -119,7 +119,8 @@ export default function Login() {
                 }
             } else if (resData.retryAfter) {
                 setRetryAfter(resData.retryAfter);
-                toast.error(resData.message);
+                setShowLockModal(true);
+                toast.error('Too many failed attempts. Try again later');
             } else {
                 toast.error("Unexpected response from server");
             }
@@ -151,10 +152,11 @@ export default function Login() {
 
             if (resData.retryAfter) {
                 setRetryAfter(resData.retryAfter);
+                setShowLockModal(true)
                 setStep(1);
                 setTempToken('');
                 setTotpCode('');
-                toast.error(resData.message || 'Too many failed attempts. Try again later');
+                toast.error('Too many failed attempts. Try again later');
                 return;
             }
 
