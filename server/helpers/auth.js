@@ -82,18 +82,19 @@ const registerLimiter = rateLimit({
 // rate limiting middleware to prevent brute-force attacks
 const loginLimiter = rateLimit({
     windowMs: 5 * 60 * 1000,
-    max: 5, // Limit each IP to 5 login requests per windowMs
-    handler: (req, res, next, options) => {
-        res.json({
-            message: 'Too many login attempts, please try again after 5 minutes.',
-            retryAfter: Math.ceil(options.windowMs / 1000), // Seconds until reset
-            remaining: 0, // No attempts left
-        });
-    },
+    max: 10, // 10 requests/5 minutes
+    message: 'Too many login attempts, please try again after 5 minutes',
     standardHeaders: true, 
     legacyHeaders: false,
 });
 
+const resetPasswordLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, 
+  max: 10, // 10 requests/5 minutes
+  message: "Too many reset attempts. Please wait before trying again.",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const adminUsersLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 phút
@@ -116,4 +117,5 @@ module.exports = {
     loginLimiter,
     adminUsersLimiter,
     updateLimiter,
+    resetPasswordLimiter
 }

@@ -23,7 +23,7 @@ const userSchema = new Schema({
     resetOtp: {type: String},
     otpExpiry: {type: Date},
     failedAttempts: { type: Number, default: 0 },
-    lockoutUntil: Date,
+  
     role: {
         type: String,
         enum: ['user', 'admin'],
@@ -31,6 +31,7 @@ const userSchema = new Schema({
     },
 
     tempTotpSecret: {type: String},
+    lastTotpVerified: {type: Date},
 }); 
 
 module.exports = mongoose.model('User', userSchema);

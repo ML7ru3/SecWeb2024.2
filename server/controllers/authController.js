@@ -6,8 +6,8 @@ const axios = require('axios');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
-require('dotenv').config();
 const speakeasy = require('speakeasy');
+require('dotenv').config();
 
 
 const test = (req, res) => {
@@ -27,29 +27,29 @@ const registerUser = async (req, res) => {
         });
 
         if (!turnstileResponse.data.success) {
-            return res.json({
+            return res.status(400).json({
                 error: 'Turnstile verification failed'
             });
         }
 
         //check if name was entered
         if(!name) {
-            return res.json({
+            return res.status(400).json({
                 error: 'Name is required.'
             })
         }
 
         if (!email){
-            return res.json({error: 'Email is required.'});
+            return res.status(400).json({error: 'Email is required.'});
         }
         if (!password) {
-            return res.json({ error: 'Password is required' });
+            return res.status(400).json({ error: 'Password is required' });
         }
         
         //Check email
         const exist = await User.findOne({ email });
         if(exist) {
-            return res.json({
+            return res.status(400).json({
                 error: 'Email already existed.'
             })
         }
@@ -58,7 +58,7 @@ const registerUser = async (req, res) => {
         
         //check is password is good
         if(!passwordRegex.test(password)){
-            return res.json({
+            return res.status(400).json({
                 error: 'Password must be at least 6 characters long and include at least one uppercase letter, one lowercase letter and one number.'
             });   
         }
@@ -71,7 +71,7 @@ const registerUser = async (req, res) => {
             password: hashedPassword,
         })
 
-        return res.json({
+        return res.status(200).json({
             id: user._id,
             name: user.name,
             email: user.email,
@@ -79,7 +79,7 @@ const registerUser = async (req, res) => {
         });
         
     } catch (err){
-        return res.json({error: 'Internal server error'});
+        return res.status(500).json({error: 'Internal server error'});
     }
 }
 
@@ -147,7 +147,7 @@ const loginUser = async (req, res) => {
         });
 
         if (!turnstileResponse.data.success) {
-            return res.json({ error: 'Turnstile verification failed' });
+            return res.status(400).json({ error: 'Turnstile verification failed' });
         }
 
         // Validate user credentials
@@ -158,13 +158,34 @@ const loginUser = async (req, res) => {
 
         const match = await comparePassword(password, user.password);
         if (!match) {
-            return res.json({ error: 'Invalid email or password' });
+            return res.status(400).json({ error: 'Invalid email or password' });
         }
 
+        // check of user has valid TOTP session in last 1 hour
+        if (user.lastTotpVerified && user.lastTotpVerified > Date.now() - 60 * 60 * 1000) {
+            // issue jwt 
+            const token = jwt.sign(
+                { email: user.email, id: user._id, name: user.name },
+                process.env.JWT_SECRET,
+                { expiresIn: '3h' }
+            );
+
+            res.cookie('token', token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                maxAge: 1000 * 60 * 60 * 3,
+            });
+
+            return res.status(200).json({ message: 'Login successfully', user });
+        }
         // Generate temporary TOTP secret
-        const tempSecret = speakeasy.generateSecret({ length: 20 }).base32;
-        user.tempTotpSecret = tempSecret;
-        await user.save();
+        if (!user.tempTotpSecret) {
+            const newTempSecret = speakeasy.generateSecret({ length: 20 }).base32;
+            user.tempTotpSecret = newTempSecret;
+            await user.save();
+        }
+
+        const tempSecret = user.tempTotpSecret;  
 
         const totp = speakeasy.totp({ secret: tempSecret, encoding: 'base32', step: 300 });
 
@@ -209,13 +230,13 @@ const verifyTotp = async (req, res) => {
         try {
             decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
         } catch (error) {
-            return res.json({ error: 'Invalid or expired temporary token' });
+            return res.status(400).json({ error: 'Invalid or expired temporary token' });
         }
 
         // Find user and validate temp secret
         const user = await User.findOne({ email: decoded.email });
         if (!user || !user.tempTotpSecret) {
-            return res.json({ error: 'Invalid session or expired code' });
+            return res.status(400).json({ error: 'Invalid session or expired code' });
         }
 
         const isValid = speakeasy.totp.verify({
@@ -227,11 +248,12 @@ const verifyTotp = async (req, res) => {
         });
 
         if (!isValid) {
-            return res.json({ error: 'Invalid verification code' });
+            return res.status(400).json({ error: 'Invalid verification code' });
         }
 
         // Clear temp secret
         user.tempTotpSecret = undefined;
+        user.lastTotpVerified = new Date();
         await user.save();
 
         // Generate final login JWT
@@ -244,7 +266,7 @@ const verifyTotp = async (req, res) => {
         // Set auth cookie
         res.cookie('token', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
             maxAge: 3600000,
         });
 
@@ -255,7 +277,6 @@ const verifyTotp = async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 };
-
 
 const getProfile = async (req, res) => {
     const { token } = req.cookies;
@@ -380,14 +401,6 @@ const forgotPassword = async (req, res) => {
             return res.status(404).json({ message: "Email not found." });
         }
 
-        // Check if user is locked out
-        if (user.lockoutUntil && user.lockoutUntil > Date.now()) {
-            const remainingTime = Math.ceil((user.lockoutUntil - Date.now()) / 1000 / 60);
-            return res.status(429).json({ 
-                message: `Too many attempts. Please try again in ${remainingTime} minutes.` 
-            });
-        }
-
         // Generate OTP and hash
         const otp = crypto.randomInt(100000, 999999).toString();
         const hashedOtp = await bcrypt.hash(otp, 10);
@@ -396,7 +409,6 @@ const forgotPassword = async (req, res) => {
         user.resetOtp = hashedOtp;
         user.otpExpiry = Date.now() + 5 * 60 * 1000;
         user.failedAttempts = 0;
-        user.lockoutUntil = undefined;
         await user.save();
 
         // SMTP configuration
@@ -439,14 +451,6 @@ const resetPassword = async (req, res) => {
             return res.status(404).json({ message: "Email not found." });
         }
 
-        // Check lockout
-        if (user.lockoutUntil && user.lockoutUntil > Date.now()) {
-            const remainingTime = Math.ceil((user.lockoutUntil - Date.now()) / 1000 / 60);
-            return res.status(429).json({ 
-                message: `Too many attempts. Please try again in ${remainingTime} minutes.` 
-            });
-        }
-
         // Validate password
         const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,64}$/;
         if (!passwordRegex.test(newPassword)) {
@@ -461,23 +465,16 @@ const resetPassword = async (req, res) => {
 
         // Check OTP expiry
         if (!user.otpExpiry || Date.now() > user.otpExpiry) {
-            return res.status(400).json({ message: "OTP expired. Please request a new one." });
+            return res.status(400).json({ message: "Invalid or expired OTP" });
         }
 
         // Verify OTP
         const isOtpValid = await bcrypt.compare(otp, user.resetOtp);
         if (!isOtpValid) {
-            user.failedAttempts = (user.failedAttempts || 0) + 1;
-            
-            // Set lockout if max attempts reached
-            if (user.failedAttempts >= process.env.MAX_ATTEMPTS) {
-                user.lockoutUntil = Date.now() + process.env.LOCKOUT_DURATION;
-            }
-            
+            user.failedAttempts += 1;
+
             await user.save();
-            return res.status(400).json({ 
-                message: `Invalid OTP. ${process.env.MAX_ATTEMPTS - user.failedAttempts} attempts remaining.` 
-            });
+            return res.status(400).json({ message: "Invalid or expired OTP" });
         }
 
         // Update password and clear reset data
@@ -485,13 +482,12 @@ const resetPassword = async (req, res) => {
         user.resetOtp = undefined;
         user.otpExpiry = undefined;
         user.failedAttempts = 0;
-        user.lockoutUntil = undefined;
+
         await user.save();
 
         return res.status(200).json({ message: "Password reset successfully!" });
 
     } catch (error) {
-        console.error('Reset password error:', error);
         return res.status(500).json({ message: "Internal Server Error" });
     }
 };

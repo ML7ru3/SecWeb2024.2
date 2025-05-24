@@ -1,20 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const { test, registerUser, loginUser, getProfile, logoutUser, updateUser, getAllUsers, deleteUser, resetUserScore, addUserByAdmin, forgotPassword, resetPassword, verifyTotp, generateMfaSecret, verifyMfaSetup, disableMfa, loginMfaVerify} = require('../controllers/authController');
-const { requireAuth, requireAdmin, registerLimiter, loginLimiter, adminUsersLimiter, updateLimiter } = require('../helpers/auth');
+const { requireAuth, requireAdmin, registerLimiter, loginLimiter, adminUsersLimiter, updateLimiter, resetPasswordLimiter } = require('../helpers/auth');
 
 
 // Routes
 router.get('/', test);
 router.post('/register', registerLimiter, registerUser);
 router.post('/login',  loginLimiter, loginUser);
-router.post('/login-mfa', loginLimiter, verifyTotp);
+router.post('/login-mfa', verifyTotp);
 
 router.get('/profile', requireAuth, getProfile);
 router.post('/logout', requireAuth, logoutUser);
 router.put('/update',  requireAuth, updateLimiter, updateUser);
 router.post('/forgot-password', forgotPassword);
-router.post('/reset-password', resetPassword);
+router.post('/reset-password', resetPasswordLimiter, resetPassword);
 
 // Admin routes
 router.use('/admin', requireAuth, requireAdmin);

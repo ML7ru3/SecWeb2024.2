@@ -11,7 +11,6 @@ const ForgotPassword = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [infoMessage, setInfoMessage] = useState('');
   const [timer, setTimer] = useState(0);
   const [canResend, setCanResend] = useState(true);
   const navigate = useNavigate();
@@ -23,8 +22,10 @@ const ForgotPassword = () => {
       countdown = setInterval(() => {
         setTimer(prev => {
           if (prev <= 1) {
-            setCanResend(true);
             clearInterval(countdown);
+            setStep(1);
+            setCanResend(true);
+            toast.error("OTP has expired. Please request a new one.");
             return 0;
           }
           return prev - 1;
@@ -41,18 +42,14 @@ const ForgotPassword = () => {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const handleSendOTP = async (e) => {
-    e.preventDefault();
+  const sendOtpRequest = async () => {
     setLoading(true);
-    setInfoMessage('');
-
     try {
       const response = await axios.post('/forgot-password', { email });
-      toast.success(response.data.message);
+      toast.success(response.data.message || 'OTP sent!');
       setStep(2);
       setTimer(5 * 60);
       setCanResend(false);
-      // clear old inputs
       setOtp('');
       setNewPassword('');
       setConfirmPassword('');
@@ -63,19 +60,18 @@ const ForgotPassword = () => {
     }
   };
 
+  const handleSendOTP = async (e) => {
+    e.preventDefault();
+    await sendOtpRequest();
+  };
+
   const handleResetPassword = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     if (timer <= 0) {
-      toast.error("OTP has expired. Please request a new one.");
+      // toast.error("OTP has expired. Please request a new one.");
       setStep(1);
-      setTimer(0);
-      setCanResend(true);
-      setOtp('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setLoading(false);
       return;
     }
 
@@ -92,28 +88,7 @@ const ForgotPassword = () => {
         navigate('/login');
       }, 1000);
     } catch (error) {
-      const errorResponse = error.response?.data;
-      const errorMessage = errorResponse?.message || "Error resetting password";
-      toast.error(errorMessage);
-
-      if (status === 429 || errorMessage.toLowerCase().includes("too many attempts")) {
-        setStep(1);
-        setTimer(0);
-        setCanResend(true); 
-        setOtp('');
-        setNewPassword('');
-        setConfirmPassword('');
-      }
-
-      if (errorResponse?.maxAttemptsReached) {
-        toast.error("Too many failed attempts. Please request a new OTP.");
-        setStep(1);
-        setTimer(0);
-        setCanResend(false); 
-        setOtp('');
-        setNewPassword('');
-        setConfirmPassword('');
-      }
+      toast.error(error.response?.data?.message || "Error resetting password");
     } finally {
       setLoading(false);
     }
@@ -141,7 +116,6 @@ const ForgotPassword = () => {
               "Send OTP"
             )}
           </button>
-          {infoMessage && <p className="info-text">{infoMessage}</p>}
         </form>
       )}
 
@@ -151,7 +125,6 @@ const ForgotPassword = () => {
 
           <label>Email</label>
           <input type="email" value={email} className="input-reset" readOnly />
-
 
           <label>New Password</label>
           <input
@@ -179,6 +152,7 @@ const ForgotPassword = () => {
             onChange={e => setOtp(e.target.value)}
             className="input-reset"
           />
+
           <p className="countdown-text">
             OTP expires in: <strong>{formatTime(timer)}</strong>
           </p>
@@ -190,6 +164,8 @@ const ForgotPassword = () => {
           >
             {loading ? 'Processing...' : 'Reset Password'}
           </button>
+
+          
         </form>
       )}
     </div>
