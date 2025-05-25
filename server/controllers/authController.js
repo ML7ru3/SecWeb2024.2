@@ -13,6 +13,14 @@ const test = (req, res) => {
    res.json({ message: 'Hello from the server!' });
 };
 
+// Helper to sanitize user object output
+function sanitizeUserOutput(user) {
+    if (!user) return user;
+    const obj = user.toObject ? user.toObject() : { ...user };
+    if (obj.name) obj.name = sanitizeHtml(obj.name);
+    return obj;
+}
+
 const registerUser = async (req, res) => {
    try {
        const { name, email, password, turnstileToken, lastSession } = req.body;
@@ -59,7 +67,7 @@ const registerUser = async (req, res) => {
 
        return res.status(201).json({
            id: user._id,
-           name: user.name,
+           name: sanitizeHtml(user.name),
            email: user.email,
            highscore: user.highscore || 0,
        });
@@ -156,7 +164,7 @@ const loginUser = async (req, res) => {
 
        return res.status(200).json({
            message: 'Login successful',
-           user: { id: user._id, name: user.name, email: user.email, role: user.role },
+           user: { id: user._id, name: sanitizeHtml(user.name), email: user.email, role: user.role },
            requiresTotp: false,
        });
    } catch (error) {
@@ -242,7 +250,7 @@ const verifyTotp = async (req, res) => {
 
        return res.status(200).json({
            message: 'Login successful',
-           user: { id: user._id, name: user.name, email: user.email, role: user.role },
+           user: { id: user._id, name: sanitizeHtml(user.name), email: user.email, role: user.role },
            requiresTotp: false,
        });
    } catch (error) {
@@ -370,7 +378,7 @@ const updateUser = async (req, res) => {
            { new: true }
        ).select('-password -refreshToken -tempTotpSecret -mfaSecret');
 
-       return res.status(200).json(updatedUser);
+       return res.status(200).json(sanitizeUserOutput(updatedUser));
    } catch (err) {
        return res.status(500).json({ error: 'Internal server error' });
    }
@@ -383,7 +391,8 @@ const getAllUsers = async (req, res) => {
            return res.status(403).json({ error: 'Forbidden: Admin access required' });
        }
        const users = await User.find().select('-password -refreshToken -tempTotpSecret -mfaSecret');
-       return res.status(200).json(users);
+       const sanitizedUsers = users.map(u => sanitizeUserOutput(u));
+       return res.status(200).json(sanitizedUsers);
    } catch (error) {
        return res.status(500).json({ error: 'Internal server error' });
    }
@@ -417,7 +426,7 @@ const resetUserScore = async (req, res) => {
        if (!updatedUser) {
            return res.status(404).json({ error: 'User not found' });
        }
-       return res.status(200).json({ message: 'Highscore reset', user: updatedUser });
+       return res.status(200).json({ message: 'Highscore reset', user: sanitizeUserOutput(updatedUser) });
    } catch (error) {
        return res.status(500).json({ error: 'Internal server error' });
    }
@@ -467,7 +476,7 @@ const addUserByAdmin = async (req, res) => {
            message: 'User created successfully',
            user: {
                id: newUser._id,
-               name: newUser.name,
+               name: sanitizeHtml(newUser.name),
                email: newUser.email,
                role: newUser.role
            }
@@ -743,7 +752,7 @@ const loginMfaVerify = async (req, res) => {
 
        return res.status(200).json({
            message: 'MFA login successful',
-           user: { id: user._id, name: user.name, email: user.email, role: user.role },
+           user: { id: user._id, name: sanitizeHtml(user.name), email: user.email, role: user.role },
            requiresTotp: false,
        });
    } catch (error) {

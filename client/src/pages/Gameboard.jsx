@@ -76,16 +76,16 @@ export default function GameBoard() {
 
     
     if (user && !isLogin.current) userGame();
-    else if (!user) continuouslySaveGame();  
     else {
         // Khởi tạo game mới cho guest
         console.log('Initializing the gane')
         setCellValues(Array(4).fill(null).map(() => Array(4).fill('')));
         addRandomNumber();
         addRandomNumber();
+        continuouslySaveGame();
     }  
     setInitialized(true)
-  }, [user, userScore]);
+  }, [user, userScore, initialized]);
 
   // Hàm thêm số ngẫu nhiên
   const addRandomNumber = () => {
