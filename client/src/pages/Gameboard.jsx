@@ -67,7 +67,6 @@ export default function GameBoard() {
     }
 
     const continuouslySaveGame = () => {
-      if (user) return;
       localStorage.setItem('guestGameState', JSON.stringify({
         gameState: cellValues,
         tempScore: userScore,
@@ -77,14 +76,15 @@ export default function GameBoard() {
 
     
     if (user && !isLogin.current) userGame();
-    else if (!user) continuouslySaveGame();    
+    else if (!user) continuouslySaveGame();  
     else {
         // Khởi tạo game mới cho guest
+        console.log('Initializing the gane')
         setCellValues(Array(4).fill(null).map(() => Array(4).fill('')));
         addRandomNumber();
         addRandomNumber();
-      }
-      setInitialized(true);
+    }  
+    setInitialized(true)
   }, [user, userScore]);
 
   // Hàm thêm số ngẫu nhiên

@@ -162,6 +162,7 @@ export default function Game() {
 
     // Check reset and add listener
     useEffect(() => {
+        console.log(initialized);
         if (!initialized) {
             console.log('Initializing the game...')
             setCellValues(Array(4).fill(null).map(() => Array(4).fill('')));
