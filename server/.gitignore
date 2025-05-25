@@ -92,3 +92,4 @@ Thumbs.db
 node_modules
 localhost-key.pem
 localhost.pem
+createAdmin.js
