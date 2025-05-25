@@ -254,7 +254,7 @@ const refreshToken = async (req, res) => {
    const refreshToken = req.cookies.refreshToken;
 
    if (!refreshToken) {
-       return res.status(401).json({ error: 'No refresh token provided' });
+       return res.status(400).json({ error: 'No refresh token provided' });
    }
 
    try {
@@ -326,7 +326,7 @@ const getProfile = async (req, res) => {
            return res.status(401).json({ error: 'Session expired! Please login again!' });
        }
        if (error.name === 'JsonWebTokenError') {
-           return res.status(401).json({ error: 'Invalid token' });
+           return res.status(400).json({ error: 'Invalid token' });
        }
        return res.status(500).json({ error: 'Internal server error' });
    }
@@ -588,6 +588,166 @@ const resetPassword = async (req, res) => {
 
        return res.status(200).json({ message: 'Password reset successfully!' });
    } catch (error) {
+       console.error('Reset password error:', error);
+       return res.status(500).json({ error: 'Internal server error' });
+   }
+};
+
+const generateMfaSecret = async (req, res) => {
+   try {
+       const { user } = req;
+       
+       if (user.role !== 'admin') {
+           return res.status(403).json({ error: 'Forbidden: Only admins can enable MFA' });
+       }
+
+       const secret = speakeasy.generateSecret({
+           length: 20,
+           name: `YourApp:${user.email}`,
+       });
+
+       user.tempMfaSecret = secret.base32;
+       await user.save();
+
+       return res.status(200).json({
+           message: 'MFA secret generated. Please scan the QR code or enter the secret in your authenticator app.',
+           secret: secret.base32,
+           qrCodeUrl: `otpauth://totp/YourApp:${user.email}?secret=${secret.base32}&issuer=YourApp`,
+       });
+   } catch (error) {
+       console.error('Generate MFA secret error:', error);
+       return res.status(500).json({ error: 'Internal server error' });
+   }
+};
+
+const verifyMfaSetup = async (req, res) => {
+   try {
+       const { user } = req;
+       const { totpCode } = req.body;
+
+       if (user.role !== 'admin') {
+           return res.status(403).json({ error: 'Forbidden: Only admins can enable MFA' });
+       }
+
+       if (!user.tempMfaSecret) {
+           return res.status(400).json({ error: 'No MFA secret found. Please generate a new secret.' });
+       }
+
+       const isValid = speakeasy.totp.verify({
+           secret: user.tempMfaSecret,
+           encoding: 'base32',
+           token: totpCode,
+           window: 1,
+           step: 30,
+       });
+
+       if (!isValid) {
+           return res.status(400).json({ error: 'Invalid TOTP code' });
+       }
+
+       user.mfaSecret = user.tempMfaSecret;
+       user.tempMfaSecret = undefined;
+       await user.save();
+
+       return res.status(200).json({ message: 'MFA setup successful' });
+   } catch (error) {
+       console.error('Verify MFA setup error:', error);
+       return res.status(500).json({ error: 'Internal server error' });
+   }
+};
+
+const disableMfa = async (req, res) => {
+   try {
+       const { user } = req;
+       
+       if (user.role !== 'admin') {
+           return res.status(403).json({ error: 'Forbidden: Only admins can disable MFA' });
+       }
+
+       user.mfaSecret = undefined;
+       await user.save();
+       return res.status(200).json({ message: 'MFA disabled successfully' });
+   } catch (error) {
+       console.error('Disable MFA error:', error);
+       return res.status(500).json({ error: 'Internal server error' });
+   }
+};
+
+const loginMfaVerify = async (req, res) => {
+   try {
+       const { tempToken, totpCode } = req.body;
+
+       let decoded;
+       try {
+           decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
+       } catch (error) {
+           return res.status(400).json({ error: 'Invalid or expired temporary token' });
+       }
+
+       const user = await User.findOne({ email: decoded.email });
+       if (!user || user.role !== 'admin') {
+           return res.status(400).json({ error: 'MFA is only required for admins' });
+       }
+
+       user.totpAttempts = (user.totpAttempts || 0) + 1;
+       if (user.totpAttempts > 3) {
+           user.lockoutUntil = Date.now() + 5 * 60 * 1000;
+           await user.save();
+           return res.status(429).json({ error: 'Too many TOTP attempts. Try again in 5 minutes.' });
+       }
+
+       const isValid = speakeasy.totp.verify({
+           secret: user.tempTotpSecret || user.mfaSecret,
+           encoding: 'base32',
+           token: totpCode,
+           window: 1,
+           step: user.tempTotpSecret ? 300 : 30,
+       });
+
+       if (!isValid) {
+           await user.save();
+           return res.status(400).json({
+               error: `Invalid verification code. ${3 - user.totpAttempts} attempts remaining.`,
+           });
+       }
+
+       user.totpAttempts = 0;
+       if (user.tempTotpSecret) {
+           user.tempTotpSecret = undefined;
+       }
+       await user.save();
+
+       const accessToken = jwt.sign(
+           { email: user.email, id: user._id, name: user.name, role: user.role },
+           process.env.JWT_SECRET,
+           { expiresIn: '1h' }
+       );
+
+       const refreshToken = generateRefreshToken();
+       user.refreshToken = refreshToken;
+       await user.save();
+
+       res.cookie('accessToken', accessToken, {
+           httpOnly: true,
+           secure: process.env.NODE_ENV === 'production',
+           sameSite: 'strict',
+           maxAge: 60 * 60 * 1000,
+       });
+
+       res.cookie('refreshToken', refreshToken, {
+           httpOnly: true,
+           secure: process.env.NODE_ENV === 'production',
+           sameSite: 'strict',
+           maxAge: 24 * 60 * 60 * 1000,
+       });
+
+       return res.status(200).json({
+           message: 'MFA login successful',
+           user: { id: user._id, name: user.name, email: user.email, role: user.role },
+           requiresTotp: false,
+       });
+   } catch (error) {
+       console.error('MFA login verify error:', error);
        return res.status(500).json({ error: 'Internal server error' });
    }
 };

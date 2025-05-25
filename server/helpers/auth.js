@@ -28,7 +28,7 @@ const requireAuth = (req, res, next) => {
     const token = req.cookies.accessToken;
 
     if (!token) {
-        return res.status(401).json({ error: 'Unauthorized: No token provided' });
+        return res.status(401).json({ error: 'Unauthorized: No user detected' });
     }
 
     try {

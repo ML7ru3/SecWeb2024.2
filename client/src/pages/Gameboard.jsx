@@ -54,39 +54,38 @@ export default function GameBoard() {
   };
 
   useEffect(() => {
-    // Khởi tạo game khi user thay đổi
-    if (user && !isLogin.current) {
-      if (user.lastGameSaved) {
-        setCellValues(user.lastGameSaved);
-        setUserScore(user.scoreFromLastGameSaved || 0);
-        setBestUserScore(user.highscore || 0);
-      } else {
-        // Khởi tạo game mới nếu không có game đã lưu
-        setCellValues(Array(4).fill(null).map(() => Array(4).fill('')));
-        setInitialized(true);
-        // Thêm 2 số ngẫu nhiên ban đầu
-        addRandomNumber();
-        addRandomNumber();
-      }
+    setBestUserScore(Math.max(bestUserScore, userScore));
+    if (initialized)  return;
+    
+    
+    const userGame = async () =>{
+      await setCellValues(user.lastGameSaved);
+      await setUserScore(user.scoreFromLastGameSaved || 0);
+      await setBestUserScore(user.highscore || 0);
       isLogin.current = true;
       setInitialized(true);
-    } else if (!user) {
-      // Xử lý cho guest
-      const guestGame = localStorage.getItem('guestGameState');
-      if (guestGame) {
-        const { gameState, tempScore, tempHighscore } = JSON.parse(guestGame);
-        setCellValues(gameState);
-        setUserScore(tempScore);
-        setBestUserScore(tempHighscore);
-      } else {
+    }
+
+    const continuouslySaveGame = () => {
+      if (user) return;
+      localStorage.setItem('guestGameState', JSON.stringify({
+        gameState: cellValues,
+        tempScore: userScore,
+        tempHighscore: bestUserScore,
+      }));
+    }
+
+    
+    if (user && !isLogin.current) userGame();
+    else if (!user) continuouslySaveGame();    
+    else {
         // Khởi tạo game mới cho guest
         setCellValues(Array(4).fill(null).map(() => Array(4).fill('')));
         addRandomNumber();
         addRandomNumber();
       }
       setInitialized(true);
-    }
-  }, [user]);
+  }, [user, userScore]);
 
   // Hàm thêm số ngẫu nhiên
   const addRandomNumber = () => {
